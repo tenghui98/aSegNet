@@ -1,14 +1,16 @@
+import os
+
 class Path(object):
     @staticmethod
-    def db_root_dir(dataset):
-        if dataset == 'cdw':
-            return '/cdw2014_train/baseline/highway200/'  # folder that contains VOCdevkit/.
-        elif dataset == 'sbd':
-            return '/path/to/datasets/benchmark_RELEASE/'  # folder that contains dataset/.
-        elif dataset == 'cityscapes':
-            return '/path/to/datasets/cityscapes/'     # foler that contains leftImg8bit/
-        elif dataset == 'coco':
-            return '/path/to/datasets/coco/'
+    def root_dir(name):
+        if name == 'img':
+            return os.path.join('D:\\','PycharmProjects','aSegNet','cdw2014_dataset')
+        elif name == 'gt':
+            return os.path.join('D:\\','PycharmProjects','aSegNet','cdw2014_train')
+        elif name =='model':
+            return os.path.join('D:\\','PycharmProjects','aSegNet','run','deeplab-cdw2014')
+        elif name =='result':
+            return os.path.join('D:\\','PycharmProjects','aSegNet','test','results')
         else:
-            print('Dataset {} not available.'.format(dataset))
+            print('{} not available.'.format(name))
             raise NotImplementedError
