@@ -8,6 +8,11 @@ import matplotlib.pyplot as plt
 
 class Normalize(object):
 
+    def __init__(self, args, mean=(0., 0., 0.), std=(1., 1., 1.)):
+        self.mean = mean
+        self.std = std
+        self.args = args
+
     def __call__(self, sample):
         img = sample['image']
         train_gt = sample['label']
@@ -17,11 +22,12 @@ class Normalize(object):
         val_gt = np.array(val_gt).astype(np.float32)
         # not use in FegNet
         img /= 255.0
-
+        img -= self.mean
+        img /= self.std
         # hard shadow 50 , outside region of interest(ROI) 85,
         train_gt[np.where((train_gt == 50) | (train_gt == 85))] = 0
         # unknown motion is set to 2,
-        train_gt[np.where(train_gt == 170)] = 0
+        train_gt[np.where(train_gt == 170)] = self.args.motion
         train_gt[np.where(train_gt == 255)] = 1
         train_gt = np.floor(train_gt)
 
@@ -34,10 +40,16 @@ class Normalize(object):
 
 
 class Normlize_test(object):
+    def __init__(self, mean=(0., 0., 0.), std=(1., 1., 1.)):
+        self.mean = mean
+        self.std = std
+
     def __call__(self, img):
         img_tmp = np.array(img).astype(np.float32)
         # not use in FegNet
         img_tmp /= 255.0
+        img_tmp -= self.mean
+        img_tmp /= self.std
         img_tmp = np.array(img_tmp).astype(np.float32).transpose((2, 0, 1))
         img = torch.from_numpy(img_tmp).float()
 

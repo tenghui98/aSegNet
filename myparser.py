@@ -14,7 +14,7 @@ def parser():
     parser.add_argument('--test_batch_size', type=int, default=32,
                         metavar='N', help='input batch size for \
                                 testing (default: auto)')
-    parser.add_argument('--use-balanced-weights', action='store_true', default=False,
+    parser.add_argument('--use_balanced_weights', action='store_true', default=False,
                         help='whether to use balanced weights (default: False)')
     parser.add_argument('--lr', type=float, default=None, metavar='LR',
                         help='learning rate (default: auto)')
@@ -41,17 +41,19 @@ def parser():
                         help='scene in category')
     parser.add_argument('--train_rate', type=int, default=0.8,
                         help='splitting rate')
-
+    parser.add_argument('--motion', type=int, default=0,
+                        help='label 170 is set to 0 or 2')
     args = parser.parse_args()
     if args.epochs is None:
         args.epochs = 100
 
     if args.batch_size is None:
-        args.batch_size = 2
+        args.batch_size = 1
 
     if args.lr is None:
         args.lr = 0.001
 
     if args.checkname is None:
+        # args.checkname = 'deeplab-cdw2014'
         args.checkname = 'deeplab-cdw2014'
     return args

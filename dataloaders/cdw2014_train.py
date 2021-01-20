@@ -14,10 +14,10 @@ class CDW_Train(Dataset):
     # VOID_LABEL = -1
     NUM_CLASSES = 2
 
-    def __init__(self, gt_dir, img_dir):
+    def __init__(self, args,gt_dir, img_dir):
         super().__init__()
         self._gt_dir = gt_dir
-
+        self.args = args
         # Search the corresponding images according to the gt list.
         img_dir_list = glob.glob(os.path.join(img_dir, '*.jpg'))
         mask_dir_list = glob.glob(os.path.join(gt_dir, '*.png'))
@@ -53,7 +53,7 @@ class CDW_Train(Dataset):
 
     def _transform(self, sample):
         composed_transforms = transforms.Compose([
-            tr.Normalize(),
+            tr.Normalize(self.args, mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
             tr.ToTensor()
         ])
         return composed_transforms(sample)

@@ -13,10 +13,11 @@ def make_data_loader( args, **kwargs):
     gt_dir = os.path.join(Path.root_dir('gt'), category, scene + str(200))
     img_dir = os.path.join(Path.root_dir('img'), category, scene, 'input')
 
-    train_and_val = CDW_Train(gt_dir=gt_dir, img_dir=img_dir)
+    train_and_val = CDW_Train(args,gt_dir=gt_dir, img_dir=img_dir)
     n_classes = train_and_val.NUM_CLASSES
 
     indices = list(range(len(train_and_val)))
+    np.random.shuffle(indices)
     split = int(np.floor(len(train_and_val) * args.train_rate))
     train_indices = indices[:split]
     val_indices = indices[split:]

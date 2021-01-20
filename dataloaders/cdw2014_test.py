@@ -25,7 +25,7 @@ class CDW_Test(Dataset):
 
     def __getitem__(self, item):
         _img = Image.open(self.img_dir_list[item]).convert('RGB')
-        trans = tr.Normlize_test()
+        trans = tr.Normlize_test(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))
         img = trans(_img)
         return img
 

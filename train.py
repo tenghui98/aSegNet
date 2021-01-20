@@ -52,6 +52,7 @@ class Trainer(object):
             self.model = self.model.cuda()
 
         self.best_pred = 0.0
+        self.flag = True
         if args.ft:
             args.start_epoch = 0
 
@@ -115,8 +116,18 @@ class Trainer(object):
         new_pred = Fmeasure
         if new_pred > self.best_pred:
             is_best = True
+            self.flag = False
             filename = self.args.scene + '.pth.tar'
             self.best_pred = new_pred
+            self.saver.save_checkpoint({
+                'epoch': epoch + 1,
+                'state_dict': self.model.state_dict(),
+                'optimizer': self.optimizer.state_dict(),
+                'best_pred': self.best_pred,
+            }, is_best, filename)
+        if epoch == self.args.epochs - 1 and self.flag:
+            is_best = False
+            filename = self.args.scene + '.pth.tar'
             self.saver.save_checkpoint({
                 'epoch': epoch + 1,
                 'state_dict': self.model.state_dict(),
