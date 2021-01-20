@@ -222,9 +222,10 @@ class DeepLabv3_plus(nn.Module):
         # ASPP
         if os == 16:
             # rates = [1, 6, 12, 18]
-            rates = [1, 4, 8, 16]
+            rates = [1, 2, 4, 8]
         elif os == 8:
-            rates = [1, 12, 24, 36]
+            rates = [1, 4, 8, 16]
+            # rates = [1, 12, 24, 36]
         else:
             raise NotImplementedError
 
@@ -237,7 +238,6 @@ class DeepLabv3_plus(nn.Module):
 
         self.global_avg_pool = nn.Sequential(nn.AdaptiveAvgPool2d((1, 1)),
                                              nn.Conv2d(2048, 256, 1, stride=1, bias=False),
-                                             nn.BatchNorm2d(256),
                                              nn.ReLU())
 
         self.conv1 = nn.Conv2d(1280, 256, 1, bias=False)
@@ -284,7 +284,7 @@ class DeepLabv3_plus(nn.Module):
         x = torch.cat((x, low_level_features), dim=1)
         x = self.last_conv(x)
         x = F.upsample(x, size=input.size()[2:], mode='bilinear', align_corners=True)
-        # x = self.decode(x)
+
         return x
 
     def freeze_bn(self):
