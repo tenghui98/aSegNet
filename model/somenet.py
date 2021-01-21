@@ -3,11 +3,12 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.utils.model_zoo as model_zoo
+from model.cbam import *
 
 class Bottleneck(nn.Module):
     expansion = 4
 
-    def __init__(self, inplanes, planes, stride=1, rate=1, downsample=None):
+    def __init__(self, inplanes, planes, stride=1, rate=1, downsample=None,use_cbam = False):
         super(Bottleneck, self).__init__()
         self.conv1 = nn.Conv2d(inplanes, planes, kernel_size=1, bias=False)
         self.bn1 = nn.BatchNorm2d(planes)
@@ -20,6 +21,10 @@ class Bottleneck(nn.Module):
         self.downsample = downsample
         self.stride = stride
         self.rate = rate
+        if use_cbam:
+            self.cbam = CBAM(planes*4, 16)
+        else:
+            self.cbam = None
 
     def forward(self, x):
         residual = x
@@ -38,6 +43,8 @@ class Bottleneck(nn.Module):
         if self.downsample is not None:
             residual = self.downsample(x)
 
+        if not self.cbam is None:
+            out = self.cbam(out)
         out += residual
         out = self.relu(out)
 
@@ -45,7 +52,7 @@ class Bottleneck(nn.Module):
 
 class ResNet(nn.Module):
 
-    def __init__(self, nInputChannels, block, layers, os=16, pretrained=False):
+    def __init__(self, nInputChannels, block, layers, os=16, pretrained=False,use_cbam = False):
         self.inplanes = 64
         super(ResNet, self).__init__()
         if os == 16:
@@ -66,17 +73,17 @@ class ResNet(nn.Module):
         self.relu = nn.ReLU(inplace=True)
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
 
-        self.layer1 = self._make_layer(block, 64, layers[0], stride=strides[0], rate=rates[0])
-        self.layer2 = self._make_layer(block, 128, layers[1], stride=strides[1], rate=rates[1])
-        self.layer3 = self._make_layer(block, 256, layers[2], stride=strides[2], rate=rates[2])
-        self.layer4 = self._make_MG_unit(block, 512, blocks=blocks, stride=strides[3], rate=rates[3])
+        self.layer1 = self._make_layer(block, 64, layers[0],use_cbam, stride=strides[0], rate=rates[0])
+        self.layer2 = self._make_layer(block, 128, layers[1], use_cbam,stride=strides[1], rate=rates[1])
+        self.layer3 = self._make_layer(block, 256, layers[2], use_cbam,stride=strides[2], rate=rates[2])
+        self.layer4 = self._make_MG_unit(block, 512, use_cbam,blocks=blocks, stride=strides[3], rate=rates[3])
 
         self._init_weight()
 
         if pretrained:
             self._load_pretrained_model()
 
-    def _make_layer(self, block, planes, blocks, stride=1, rate=1):
+    def _make_layer(self, block, planes, blocks, use_cbam,stride=1, rate=1):
         downsample = None
         if stride != 1 or self.inplanes != planes * block.expansion:
             downsample = nn.Sequential(
@@ -86,14 +93,14 @@ class ResNet(nn.Module):
             )
 
         layers = []
-        layers.append(block(self.inplanes, planes, stride, rate, downsample))
+        layers.append(block(self.inplanes, planes, stride, rate, downsample,use_cbam))
         self.inplanes = planes * block.expansion
         for i in range(1, blocks):
             layers.append(block(self.inplanes, planes))
 
         return nn.Sequential(*layers)
 
-    def _make_MG_unit(self, block, planes, blocks=[1,2,4], stride=1, rate=1):
+    def _make_MG_unit(self, block, planes, use_cbam, blocks=[1,2,4], stride=1, rate=1):
         downsample = None
         if stride != 1 or self.inplanes != planes * block.expansion:
             downsample = nn.Sequential(
@@ -103,7 +110,7 @@ class ResNet(nn.Module):
             )
 
         layers = []
-        layers.append(block(self.inplanes, planes, stride, rate=blocks[0]*rate, downsample=downsample))
+        layers.append(block(self.inplanes, planes, stride, rate=blocks[0]*rate, downsample=downsample, use_cbam=use_cbam))
         self.inplanes = planes * block.expansion
         for i in range(1, len(blocks)):
             layers.append(block(self.inplanes, planes, stride=1, rate=blocks[i]*rate))
@@ -169,8 +176,8 @@ def get_10x_lr_params(model):
                 yield k
 
 
-def ResNet50(nInputChannels=3, os=16, pretrained=False):
-    model = ResNet(nInputChannels, Bottleneck, [3, 4, 6, 3], os, pretrained=pretrained)
+def ResNet50(nInputChannels=3, os=16, pretrained=False,use_cbam = False):
+    model = ResNet(nInputChannels, Bottleneck, [3, 4, 6, 3], os, pretrained=pretrained, use_cbam=use_cbam)
     return model
 
 
@@ -208,7 +215,7 @@ class ASPP_module(nn.Module):
 
 
 class DeepLabv3_plus(nn.Module):
-    def __init__(self, nInputChannels=3, n_classes=2, os=16, pretrained=False, _print=True):
+    def __init__(self, nInputChannels=3, n_classes=2, os=16, pretrained=False, use_cbam = False, _print=True):
         if _print:
             print("Constructing DeepLabv3+ model...")
             print("Number of classes: {}".format(n_classes))
@@ -217,7 +224,7 @@ class DeepLabv3_plus(nn.Module):
         super(DeepLabv3_plus, self).__init__()
 
         # Atrous Conv
-        self.resnet_features = ResNet50(nInputChannels, os, pretrained=pretrained)
+        self.resnet_features = ResNet50(nInputChannels, os, pretrained=pretrained, use_cbam=use_cbam)
 
         # ASPP
         if os == 16:
@@ -242,7 +249,7 @@ class DeepLabv3_plus(nn.Module):
 
         self.conv1 = nn.Conv2d(1280, 256, 1, bias=False)
         self.bn1 = nn.BatchNorm2d(256)
-
+        self.aspp_cbam = CBAM(48, reduction_ratio=16)
         # adopt [1x1, 48] for channel reduction.
         self.conv2 = nn.Conv2d(256, 48, 1, bias=False)
         self.bn2 = nn.BatchNorm2d(48)
@@ -267,23 +274,24 @@ class DeepLabv3_plus(nn.Module):
         x4 = self.aspp4(x)
         x5 = self.global_avg_pool(x)
         x5 = F.upsample(x5, size=x4.size()[2:], mode='bilinear', align_corners=True)
-
         x = torch.cat((x1, x2, x3, x4, x5), dim=1)
         x = self.concat_dropout(x)
         x = self.conv1(x)
         x = self.bn1(x)
         x = self.relu(x)
-        x = F.upsample(x, size=(int(math.ceil(input.size()[-2]/4)),
+
+        x = F.interpolate(x, size=(int(math.ceil(input.size()[-2]/4)),
                                 int(math.ceil(input.size()[-1]/4))), mode='bilinear', align_corners=True)
 
         low_level_features = self.conv2(low_level_features)
         low_level_features = self.bn2(low_level_features)
+        # low_level_features = self.aspp_cbam(low_level_features)
         low_level_features = self.relu(low_level_features)
 
 
         x = torch.cat((x, low_level_features), dim=1)
         x = self.last_conv(x)
-        x = F.upsample(x, size=input.size()[2:], mode='bilinear', align_corners=True)
+        x = F.interpolate(x, size=input.size()[2:], mode='bilinear', align_corners=True)
 
         return x
 
@@ -329,7 +337,7 @@ def get_10x_lr_params(model):
 
 
 if __name__ == "__main__":
-    model = DeepLabv3_plus(nInputChannels=3, n_classes=2, os=16, pretrained=True, _print=True)
+    model = DeepLabv3_plus(nInputChannels=3, n_classes=2, os=16, pretrained=True, use_cbam=True, _print=True)
     model.eval()
     image = torch.randn(5, 3, 512, 512)
     with torch.no_grad():
