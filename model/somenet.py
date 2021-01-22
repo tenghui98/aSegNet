@@ -74,9 +74,10 @@ class ResNet(nn.Module):
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
 
         self.layer1 = self._make_layer(block, 64, layers[0],use_cbam, stride=strides[0], rate=rates[0])
-        self.layer2 = self._make_layer(block, 128, layers[1], use_cbam,stride=strides[1], rate=rates[1])
-        self.layer3 = self._make_layer(block, 256, layers[2], use_cbam,stride=strides[2], rate=rates[2])
-        self.layer4 = self._make_MG_unit(block, 512, use_cbam,blocks=blocks, stride=strides[3], rate=rates[3])
+        self.layer2 = self._make_layer(block, 128, layers[1], use_cbam, stride=strides[1], rate=rates[1])
+        self.layer3 = self._make_layer(block, 256, layers[2], use_cbam, stride=strides[2], rate=rates[2])
+        self.layer4 = self._make_layer(block, 512, layers[3], use_cbam, stride=strides[3], rate=rates[3])
+        # self.layer4 = self._make_MG_unit(block, 512, use_cbam,blocks=blocks, stride=strides[3], rate=rates[3])
 
         self._init_weight()
 
@@ -229,7 +230,7 @@ class DeepLabv3_plus(nn.Module):
         # ASPP
         if os == 16:
             # rates = [1, 6, 12, 18]
-            rates = [1, 2, 4, 8]
+            rates = [1, 4, 8, 16]
         elif os == 8:
             rates = [1, 4, 8, 16]
             # rates = [1, 12, 24, 36]
@@ -285,7 +286,6 @@ class DeepLabv3_plus(nn.Module):
 
         low_level_features = self.conv2(low_level_features)
         low_level_features = self.bn2(low_level_features)
-        # low_level_features = self.aspp_cbam(low_level_features)
         low_level_features = self.relu(low_level_features)
 
 
@@ -303,9 +303,9 @@ class DeepLabv3_plus(nn.Module):
     def __init_weight(self):
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
-                n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
-                m.weight.data.normal_(0, math.sqrt(2. / n))
-                # torch.nn.init.kaiming_normal_(m.weight)
+                # n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
+                # m.weight.data.normal_(0, math.sqrt(2. / n))
+                torch.nn.init.kaiming_normal_(m.weight)
             elif isinstance(m, nn.BatchNorm2d):
                 m.weight.data.fill_(1)
                 m.bias.data.zero_()
