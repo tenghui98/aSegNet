@@ -55,6 +55,7 @@ class Saver(object):
         p['batch_size'] =self.args.batch_size
         p['use_balance_weight'] = self.args.use_balanced_weights
         p['motion label'] = self.args.motion
+        p['cbam'] = self.args.cbam
 
         for key, val in p.items():
             log_file.write(key + ':' + str(val) + '\n')

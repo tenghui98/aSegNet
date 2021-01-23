@@ -2,6 +2,7 @@ import os
 from tqdm import tqdm
 import numpy as np
 from mypath import Path
+from sklearn.utils import compute_class_weight
 
 def calculate_weigths_labels(args, dataloader, num_classes):
     # Create an instance from the data loader
@@ -21,6 +22,7 @@ def calculate_weigths_labels(args, dataloader, num_classes):
     class_weights = []
     for frequency in z:
         class_weight = 1 / (np.log(1.02 + (frequency / total_frequency)))
+        # class_weight = total_frequency / frequency
         class_weights.append(class_weight)
     ret = np.array(class_weights)
     classes_weights_path = os.path.join(Path.root_dir('img'), args.category, args.scene, args.scene + '_classes_weights.npy')

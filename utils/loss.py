@@ -1,9 +1,10 @@
 import torch
 import torch.nn as nn
-
+from torch import Tensor
+from .dice_loss import DiceLoss
 
 class SegmentationLosses(object):
-    def __init__(self, weight=None, size_average=True, ignore_index=2, batch_average=True, cuda=False):
+    def __init__(self, weight=None, size_average=True, ignore_index=2, batch_average=True, cuda=True):
         self.ignore_index = ignore_index
         self.weight = weight
         self.size_average = size_average
@@ -16,13 +17,15 @@ class SegmentationLosses(object):
             return self.CrossEntropyLoss
         elif mode == 'focal':
             return self.FocalLoss
+        elif mode == 'dice':
+            return self.DiceLoss
         else:
             raise NotImplementedError
 
     def CrossEntropyLoss(self, logit, target):
         n, c, h, w = logit.size()
         # criterion = nn.CrossEntropyLoss(weight=self.weight,reduction='mean')
-        criterion = nn.CrossEntropyLoss(weight=self.weight, ignore_index= self.ignore_index,reduction='mean')
+        criterion = nn.CrossEntropyLoss(weight=self.weight, ignore_index=self.ignore_index, reduction='mean')
         if self.cuda:
             criterion = criterion.cuda()
 
@@ -49,6 +52,32 @@ class SegmentationLosses(object):
             loss /= n
 
         return loss
+
+    def DiceLoss(self, logit, target):
+        criterion = DiceLoss(weight=self.weight,ignore_index=self.ignore_index)
+        if self.cuda:
+            criterion = criterion.cuda()
+        loss = criterion(logit, target)
+        return loss
+
+
+# class DiceLoss(nn.Module):
+#     def __init__(self):
+#         super(DiceLoss, self).__init__()
+#
+#     def forward(self, input, target):
+#         N = target.size(0)
+#         smooth = 1
+#         input = torch.argmax(input,1)
+#         input_flat = input.view(N, -1)
+#         target_flat = target.view(N, -1)
+#
+#         intersection = input_flat * target_flat
+#
+#         loss = 2 * (intersection.sum(1) + smooth) / (input_flat.sum(1) + target_flat.sum(1) + smooth)
+#         loss = 1 - loss.sum() / N
+#
+#         return loss
 
 
 if __name__ == "__main__":

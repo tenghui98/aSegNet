@@ -79,6 +79,34 @@ class ToTensor(object):
                 'label': mask,
                 'val_label':val}
 
+
+class RandomGaussianBlur(object):
+    def __call__(self, sample):
+        img = sample['image']
+        mask = sample['label']
+        val = sample['val_label']
+        if random.random() < 0.5:
+            img = img.filter(ImageFilter.GaussianBlur(
+                radius=random.random()))
+
+        return {'image': img,
+                'label': mask,
+                'val_label':val}
+
+class RandomHorizontalFlip(object):
+    def __call__(self, sample):
+        img = sample['image']
+        mask = sample['label']
+        val = sample['val_label']
+        if random.random() < 0.5:
+            img = img.transpose(Image.FLIP_LEFT_RIGHT)
+            mask = mask.transpose(Image.FLIP_LEFT_RIGHT)
+            val = val.transpose(Image.FLIP_LEFT_RIGHT)
+        return {'image': img,
+                'label': mask,
+                'val_label':val,}
+
+
 def decode_segmap(label_mask, plot=False):
     label_colours = np.asarray([[0, 0, 0], [255, 255, 255]])
     n_classes = 2

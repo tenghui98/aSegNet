@@ -2,7 +2,7 @@ import argparse
 def parser():
     parser = argparse.ArgumentParser(description='Deeplab training')
     parser.add_argument('--loss-type', type=str, default='ce',
-                        choices=['ce', 'focal'],
+                        choices=['ce', 'focal','dice'],
                         help='loss func type (default: ce)')
     parser.add_argument('--epochs', type=int, default=None, metavar='N',
                         help='number of epochs to train (default: auto)')
@@ -43,6 +43,8 @@ def parser():
                         help='splitting rate')
     parser.add_argument('--motion', type=int, default=0,
                         help='label 170 is set to 0 or 2')
+    parser.add_argument('--cbam', action='store_true', default=False,
+                        help='cbam attention')
     args = parser.parse_args()
     if args.epochs is None:
         args.epochs = 100
@@ -55,5 +57,5 @@ def parser():
 
     if args.checkname is None:
         # args.checkname = 'deeplab-cdw2014'
-        args.checkname = 'deeplab-cdw2014'
+        args.checkname = 'deepfeg-cdw2014'
     return args

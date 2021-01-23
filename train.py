@@ -23,9 +23,9 @@ class Trainer(object):
         self.writer = self.summary.create_summary()
         kwargs = {}
         self.train_loader, self.val_loader, self.test_loader, self.nclass = make_data_loader(args, **kwargs)
-        model = DeepLabv3_plus(nInputChannels=3, n_classes=2, os=16, pretrained=True)
+        model = DeepLabv3_plus(nInputChannels=3, n_classes=2, os=8, use_cbam= self.args.cbam, pretrained=True)
         train_params = [{'params': get_1x_lr_params(model), 'lr': args.lr},
-                        {'params': get_10x_lr_params(model), 'lr': args.lr * 10}]
+                        {'params': get_10x_lr_params(model), 'lr': args.lr*10}]
         optimizer = torch.optim.SGD(train_params, momentum=args.momentum,
                                     weight_decay=args.weight_decay, nesterov=False)
 
@@ -67,6 +67,7 @@ class Trainer(object):
                 image, target = image.cuda(), target.cuda()
             self.scheduler(self.optimizer, i, epoch, self.best_pred)
             self.optimizer.zero_grad()
+
             output = self.model(image)
             loss = self.criterion(output, target)
             loss.backward()
@@ -95,6 +96,7 @@ class Trainer(object):
                 image, target = image.cuda(), target.cuda()
             with torch.no_grad():
                 output = self.model(image)
+
             loss = self.criterion(output, target)
             val_loss += loss.item()
             tbar.set_description('Val loss: %.5f' % (val_loss / (i + 1)))
