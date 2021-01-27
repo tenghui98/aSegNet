@@ -26,14 +26,17 @@ class Normalize(object):
         img /= self.std
         # hard shadow 50 , outside region of interest(ROI) 85,
         train_gt[np.where((train_gt == 50) | (train_gt == 85))] = 0
-        # unknown motion is set to 2,
-        train_gt[np.where(train_gt == 170)] = self.args.motion
         train_gt[np.where(train_gt == 255)] = 1
-        train_gt = np.floor(train_gt)
+        # unknown motion is set to 2,
+        if self.args.motion:
+            train_gt[np.where(train_gt == 170)] = 0.5
+        else:
+            train_gt[np.where(train_gt == 170)] = 0
+        # train_gt = np.floor(train_gt)
 
         val_gt[np.where((val_gt == 50) | (val_gt == 85) | (val_gt == 170))] = 2
         val_gt[np.where(val_gt == 255)] = 1
-        val_gt = np.floor(val_gt)
+        # val_gt = np.floor(val_gt)
         return {'image': img,
                 'label': train_gt,
                 'val_label':val_gt}

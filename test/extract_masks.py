@@ -1,6 +1,6 @@
 from tqdm import tqdm
 import torch
-from model.somenet import DeepLabv3_plus
+from model.deepfeg import DeepLabv3_plus
 import os
 import numpy as np
 from myparser import parser
@@ -12,7 +12,7 @@ import imageio
 
 model_main_dir = Path.root_dir('model')
 args = parser()
-model = DeepLabv3_plus(nInputChannels=3, n_classes=2, os=16, pretrained=True)
+model = DeepLabv3_plus(nInputChannels=3, n_classes=2, os=8, pretrained=True)
 for category,scene_list in dataset.items():
     for scene in scene_list:
         args.category = category
@@ -33,9 +33,10 @@ for category,scene_list in dataset.items():
             if args.cuda:
                 img = img.cuda()
             with torch.no_grad():
-                pred = model(img)
+                outputs = model(img)
 
-            out = torch.max(pred,1)[1].detach().cpu().numpy()
+            pred = outputs['pred_224'].squeeze()
+            out = (pred > 0.5).cpu().numpy().astype('int')
             out *= 255
             out = out.astype(np.uint8)
 

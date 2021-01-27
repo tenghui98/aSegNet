@@ -41,7 +41,7 @@ def parser():
                         help='scene in category')
     parser.add_argument('--train_rate', type=int, default=0.8,
                         help='splitting rate')
-    parser.add_argument('--motion', type=int, default=0,
+    parser.add_argument('--motion', action='store_false', default=True,
                         help='label 170 is set to 0 or 2')
     parser.add_argument('--cbam', action='store_true', default=False,
                         help='cbam attention')

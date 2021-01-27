@@ -2,9 +2,10 @@ import torch
 import torch.nn as nn
 from torch import Tensor
 from .dice_loss import DiceLoss
+import torch.nn.functional as F
 
 class SegmentationLosses(object):
-    def __init__(self, weight=None, size_average=True, ignore_index=2, batch_average=True, cuda=True):
+    def __init__(self, weight=None, size_average=True, ignore_index=0.5, batch_average=True, cuda=True):
         self.ignore_index = ignore_index
         self.weight = weight
         self.size_average = size_average
@@ -22,17 +23,63 @@ class SegmentationLosses(object):
         else:
             raise NotImplementedError
 
-    def CrossEntropyLoss(self, logit, target):
-        n, c, h, w = logit.size()
-        # criterion = nn.CrossEntropyLoss(weight=self.weight,reduction='mean')
-        criterion = nn.CrossEntropyLoss(weight=self.weight, ignore_index=self.ignore_index, reduction='mean')
-        if self.cuda:
-            criterion = criterion.cuda()
+    def CrossEntropyLoss(self, images):
 
-        loss = criterion(logit, target.long())
+        gt = images['gt']
+        out_28 = images['out_28']
+        out_56= images['out_56']
+        out_224 = images['out_224']
+        pred_28 = images['pred_28']
+        pred_56 = images['pred_56']
+        pred_224 = images['pred_224']
 
-        if self.batch_average:
-            loss /= n
+        n = gt.size(0)
+        mask = torch.ne(gt,self.ignore_index)
+        gt = gt[mask]
+        pred_28 = pred_28[mask]
+        pred_56 = pred_56[mask]
+        pred_224 = pred_224[mask]
+        out_28 = out_28[mask]
+        out_56 = out_56[mask]
+        out_224 = out_224[mask]
+
+        ce_weights = [1.0,0.5,0.0]
+        l1_weights = [0.0,0.25,1.0]
+        l2_weights = [0.0,0.25,1.0]
+        # ce_weights = [0.0, 1.0, 0.5, 1.0, 1.0, 0.5]
+        # l1_weights = [1.0, 0.0, 0.25, 0.0, 0.0, 0.25]
+        # l2_weights = [1.0, 0.0, 0.25, 0.0, 0.0, 0.25]
+        # grad_weight = 0.5
+        ce_loss = [0] * 3
+        l1_loss = [0] * 3
+        l2_loss = [0] * 3
+        loss = 0.0
+
+        ce_loss[0] = F.binary_cross_entropy_with_logits(out_28, (gt>0.5).float())
+        ce_loss[1] = F.binary_cross_entropy_with_logits(out_56, (gt>0.5).float())
+        ce_loss[2] = F.binary_cross_entropy_with_logits(out_224, (gt>0.5).float())
+
+
+        l1_loss[0] = F.l1_loss(pred_28, gt)
+        l2_loss[0] = F.mse_loss(pred_28, gt)
+        l1_loss[1] = F.l1_loss(pred_56, gt)
+        l2_loss[1] = F.mse_loss(pred_56, gt)
+        l1_loss[2] = F.l1_loss(pred_224, gt)
+        l2_loss[2] = F.mse_loss(pred_224, gt)
+        # grad_loss = F.l1_loss(images['gt_sobel'], images['pred_sobel'])
+
+        for i in range(3):
+            loss += ce_loss[i] * ce_weights[i] + l1_loss[i] * l1_weights[i] + l2_loss[i] * l2_weights[i]
+        # loss += grad_loss*grad_weight
+
+
+        # target.unsqueeze_(1)
+        # # criterion = nn.CrossEntropyLoss(weight=self.weight,reduction='mean')
+        # # criterion = nn.CrossEntropyLoss(weight=self.weight, ignore_index=self.ignore_index, reduction='mean')
+        # loss = F.binary_cross_entropy_with_logits(logit,target,reduction='mean')
+
+        # if self.batch_average:
+        #     loss /= n
 
         return loss
 
@@ -59,25 +106,6 @@ class SegmentationLosses(object):
             criterion = criterion.cuda()
         loss = criterion(logit, target)
         return loss
-
-
-# class DiceLoss(nn.Module):
-#     def __init__(self):
-#         super(DiceLoss, self).__init__()
-#
-#     def forward(self, input, target):
-#         N = target.size(0)
-#         smooth = 1
-#         input = torch.argmax(input,1)
-#         input_flat = input.view(N, -1)
-#         target_flat = target.view(N, -1)
-#
-#         intersection = input_flat * target_flat
-#
-#         loss = 2 * (intersection.sum(1) + smooth) / (input_flat.sum(1) + target_flat.sum(1) + smooth)
-#         loss = 1 - loss.sum() / N
-#
-#         return loss
 
 
 if __name__ == "__main__":
