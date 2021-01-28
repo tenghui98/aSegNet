@@ -37,6 +37,8 @@ class Trainer(object):
             else:
                 weight = calculate_weigths_labels(args, self.train_loader, self.nclass)
             weight = torch.from_numpy(weight.astype(np.float32))
+            if args.cuda:
+                weight = weight.cuda()
         else:
             weight = None
 
@@ -67,11 +69,8 @@ class Trainer(object):
                 image, target = image.cuda(), target.cuda()
             self.scheduler(self.optimizer, i, epoch, self.best_pred)
             self.optimizer.zero_grad()
-            outputs = self.model(image)
-            outputs['gt'] = target.unsqueeze_(1)
-            SobelComputer().compute_edges(outputs)
-
-            loss = self.criterion(outputs)
+            pred = self.model(image)
+            loss = self.criterion(pred,target)
             loss.backward()
             self.optimizer.step()
             train_loss += loss.item()
@@ -82,7 +81,7 @@ class Trainer(object):
             #     global_step = i + num_img_tr * epoch
             #     self.summary.visualize_image(self.writer, image, target, output, global_step)
             if i == 0:
-                self.summary.visualize_image(self.writer, image, target, outputs, epoch)
+                self.summary.visualize_image(self.args, self.writer, image, target, pred, epoch)
         self.writer.add_scalar('train/total_loss_epoch', train_loss/num_img_tr, epoch)
         print('[Epoch: %d, numImages: %5d]' % (epoch, i * self.args.batch_size + image.data.shape[0]))
         print('Loss: %.5f' % train_loss)
@@ -93,21 +92,20 @@ class Trainer(object):
         val_loss = 0.0
         num_img_val = len(self.val_loader)
         for i, sample in enumerate(tbar):
-            image, target, val_target = sample['image'], sample['label'], sample['val_label']
+            image, target = sample['image'], sample['label']
             if self.args.cuda:
                 image, target = image.cuda(), target.cuda()
             with torch.no_grad():
-                outputs = self.model(image)
-            outputs['gt'] = target.unsqueeze_(1)
-            SobelComputer().compute_edges(outputs)
-            loss = self.criterion(outputs)
+                pred = self.model(image)
+            loss = self.criterion(pred,target)
             val_loss += loss.item()
             tbar.set_description('Val loss: %.5f' % (val_loss / (i + 1)))
-            output = torch.squeeze(outputs['pred_224'],1)
-            pred = output.data.cpu().numpy()
-            val_target = val_target.cpu().numpy()
-            pred = pred>0.5
-            self.evaluator.add_batch(val_target, pred)
+            pred = torch.squeeze(torch.sigmoid(pred),1)
+            pred = pred.data.cpu().numpy()
+            pred = (pred>0.5).astype('int')
+            target = target.cpu().numpy()
+
+            self.evaluator.add_batch(target, pred)
 
         Acc = self.evaluator.Pixel_Accuracy()
         Recall,Precision, Fmeasure = self.evaluator.Stats()

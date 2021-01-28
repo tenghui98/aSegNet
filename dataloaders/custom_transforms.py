@@ -15,31 +15,20 @@ class Normalize(object):
 
     def __call__(self, sample):
         img = sample['image']
-        train_gt = sample['label']
-        val_gt = sample['val_label']
+        gt = sample['label']
         img = np.array(img).astype(np.float32)
-        train_gt = np.array(train_gt).astype(np.float32)
-        val_gt = np.array(val_gt).astype(np.float32)
+        gt = np.array(gt).astype(np.float32)
         # not use in FegNet
         img /= 255.0
         img -= self.mean
         img /= self.std
         # hard shadow 50 , outside region of interest(ROI) 85,
-        train_gt[np.where((train_gt == 50) | (train_gt == 85))] = 0
-        train_gt[np.where(train_gt == 255)] = 1
-        # unknown motion is set to 2,
-        if self.args.motion:
-            train_gt[np.where(train_gt == 170)] = 0.5
-        else:
-            train_gt[np.where(train_gt == 170)] = 0
-        # train_gt = np.floor(train_gt)
+        gt[np.where((gt == 50) | (gt == 85) |(gt == 170))] = -1.0
+        gt[np.where(gt == 255)] = 1
 
-        val_gt[np.where((val_gt == 50) | (val_gt == 85) | (val_gt == 170))] = 2
-        val_gt[np.where(val_gt == 255)] = 1
         # val_gt = np.floor(val_gt)
         return {'image': img,
-                'label': train_gt,
-                'val_label':val_gt}
+                'label': gt}
 
 
 class Normlize_test(object):
@@ -68,46 +57,38 @@ class ToTensor(object):
         # torch image: C X H X W
         img = sample['image']
         mask = sample['label']
-        val = sample['val_label']
 
         img = np.array(img).astype(np.float32).transpose((2, 0, 1))
         mask = np.array(mask).astype(np.float32)
-        val = np.array(val).astype(np.float32)
 
         img = torch.from_numpy(img).float()
         mask = torch.from_numpy(mask).float()
-        val = torch.from_numpy(val).float()
 
         return {'image': img,
-                'label': mask,
-                'val_label':val}
+                'label': mask}
 
 
 class RandomGaussianBlur(object):
     def __call__(self, sample):
         img = sample['image']
         mask = sample['label']
-        val = sample['val_label']
+
         if random.random() < 0.5:
             img = img.filter(ImageFilter.GaussianBlur(
                 radius=random.random()))
 
         return {'image': img,
-                'label': mask,
-                'val_label':val}
+                'label': mask}
 
 class RandomHorizontalFlip(object):
     def __call__(self, sample):
         img = sample['image']
         mask = sample['label']
-        val = sample['val_label']
         if random.random() < 0.5:
             img = img.transpose(Image.FLIP_LEFT_RIGHT)
             mask = mask.transpose(Image.FLIP_LEFT_RIGHT)
-            val = val.transpose(Image.FLIP_LEFT_RIGHT)
         return {'image': img,
-                'label': mask,
-                'val_label':val,}
+                'label': mask}
 
 
 def decode_segmap(label_mask, plot=False):

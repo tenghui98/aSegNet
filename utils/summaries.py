@@ -1,8 +1,11 @@
 import os
 import torch
+from PIL import Image
 from torchvision.utils import make_grid
 from tensorboardX import SummaryWriter
 from dataloaders.custom_transforms import decode_segmap_sequence
+import numpy as np
+from mypath import Path
 
 class TensorboardSummary(object):
     def __init__(self, directory):
@@ -12,18 +15,19 @@ class TensorboardSummary(object):
         writer = SummaryWriter(log_dir=os.path.join(self.directory))
         return writer
 
-    def visualize_image(self, writer, image, target, outputs, global_step):
-        # image *= 255.0
-        # image = image.int()
-        pred_28 = decode_segmap_sequence((torch.squeeze(outputs['pred_28'],1)>0.5).detach().cpu().numpy().astype('int'))
-        pred_56 = decode_segmap_sequence((torch.squeeze(outputs['pred_56'],1)>0.5).detach().cpu().numpy().astype('int'))
-        pred_224 = decode_segmap_sequence((torch.squeeze(outputs['pred_224'],1)>0.5).detach().cpu().numpy().astype('int'))
-        images = torch.cat([pred_28,pred_56,pred_224])
+    def visualize_image(self, args, writer, image, target, logit, global_step):
 
-        grid_image = make_grid(image[:3].clone().cpu().data, 3, normalize=True)
-        writer.add_image('Image', grid_image, global_step)
-        grid_image = make_grid(images,3, normalize=False, range=(0, 255))
-        writer.add_image('Predicted label', grid_image, global_step)
-        grid_image = make_grid(decode_segmap_sequence(torch.squeeze(target[:3], 1).detach().cpu().numpy()),
-                               3, normalize=False, range=(0, 255))
-        writer.add_image('Groundtruth label', grid_image, global_step)
+        writer.add_image('Image', torch.squeeze(image,0), global_step)
+        # visual pred
+        logit = torch.sigmoid(logit)
+        logit = (torch.squeeze(logit)>0.5).detach().cpu().numpy().astype('int')
+        roi_path = os.path.join(Path.root_dir('img'),args.category,args.scene,'ROI.bmp')
+        ROI = Image.open(roi_path)
+        ROI = np.array(ROI).astype(np.float32)
+        logit[np.where(ROI == 0.)] = 0.
+        logit = torch.from_numpy(logit).unsqueeze(0)
+        # grid_image = make_grid(logit,3, normalize=False, range=(0, 255))
+        writer.add_image('Predicted label', logit, global_step)
+
+        writer.add_image('Groundtruth label',
+                         decode_segmap_sequence(torch.squeeze(target[:3], 1).detach().cpu().numpy()).squeeze(0), global_step)

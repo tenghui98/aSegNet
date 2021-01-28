@@ -41,15 +41,14 @@ class CDW_Train(Dataset):
         return len(self.img_dir_list)
 
     def __getitem__(self, item):
-        _img, _target, _val = self._make_img_gt_point_pair(item)
-        sample = {'image': _img, 'label': _target, 'val_label': _val}
+        _img, _target= self._make_img_gt_point_pair(item)
+        sample = {'image': _img, 'label': _target}
         return self._transform(sample)
 
     def _make_img_gt_point_pair(self, item):
         _img = Image.open(self.img_dir_list[item]).convert('RGB')
         _target = Image.open(self.mask_dir_list[item])
-        _val = _target
-        return _img, _target, _val
+        return _img, _target
 
     def _transform(self, sample):
         composed_transforms = transforms.Compose([
