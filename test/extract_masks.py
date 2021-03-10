@@ -1,6 +1,6 @@
 from tqdm import tqdm
 import torch
-from model.somenet import DeepLabv3_plus
+from model.deepfeg import DeepLabv3_plus
 import os
 import numpy as np
 from myparser import parser
@@ -33,9 +33,12 @@ for category,scene_list in dataset.items():
             if args.cuda:
                 img = img.cuda()
             with torch.no_grad():
-                pred = model(img)
+                outputs = model(img)
 
-            out = torch.max(pred,1)[1].detach().cpu().numpy()
+            pred = outputs['s1']
+            pred = torch.squeeze(torch.sigmoid(pred),1)
+
+            out = (pred > 0.5).cpu().numpy().astype('int')
             out *= 255
             out = out.astype(np.uint8)
 

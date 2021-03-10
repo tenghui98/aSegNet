@@ -95,7 +95,7 @@ def isValidRootFolder(path):
     """A valid root folder must have the six categories"""
     #categories = set(['Board_a', 'Candela_m1.10_a', 'CAVIAR1_a', 'CAVIAR2_a', 'CaVignal_a','Foliage_a', 'HallAndMonitor_a', 'HighwayI_a', 'HighwayII_a', 'HumanBody2_a', 'IBMtest2_a', 'PeopleAndFoliage_a', 'Toscana_a','Snellen_a'])
     categories = set(['dynamicBackground', 
-                      'baseline',  
+                      'baseline',
                       'cameraJitter', 
                       'intermittentObjectMotion', 
                       'shadow', 

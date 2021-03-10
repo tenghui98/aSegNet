@@ -8,7 +8,7 @@ class Path(object):
         elif name == 'gt':
             return os.path.join('D:\\','PycharmProjects','aSegNet','cdw2014_train')
         elif name =='model':
-            return os.path.join('D:\\','PycharmProjects','aSegNet','run','deeplab-cdw2014')
+            return os.path.join('D:\\','PycharmProjects','aSegNet','run','deepfeg-cdw2014')
         elif name =='result':
             return os.path.join('D:\\','PycharmProjects','aSegNet','test','results')
         else:

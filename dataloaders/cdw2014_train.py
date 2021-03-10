@@ -41,19 +41,19 @@ class CDW_Train(Dataset):
         return len(self.img_dir_list)
 
     def __getitem__(self, item):
-        _img, _target, _val = self._make_img_gt_point_pair(item)
-        sample = {'image': _img, 'label': _target, 'val_label': _val}
+        _img, _target= self._make_img_gt_point_pair(item)
+        sample = {'image': _img, 'label': _target}
         return self._transform(sample)
 
     def _make_img_gt_point_pair(self, item):
         _img = Image.open(self.img_dir_list[item]).convert('RGB')
         _target = Image.open(self.mask_dir_list[item])
-        _val = _target
-        return _img, _target, _val
+        return _img, _target
 
     def _transform(self, sample):
         composed_transforms = transforms.Compose([
             # tr.RandomHorizontalFlip(),
+            # tr.RandomScaleCrop(base_size=240, crop_size=224),
             # tr.RandomGaussianBlur(),
             tr.Normalize(self.args, mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
             tr.ToTensor()
@@ -69,7 +69,7 @@ if __name__ == '__main__':
     import matplotlib.pyplot as plt
     from mypath import Path
 
-    cdw_train = CDW_Train(img_dir=os.path.join(Path.root_dir('img'), 'baseline', 'highway', 'input'),
+    cdw_train = CDW_Train(args=None,img_dir=os.path.join(Path.root_dir('img'), 'baseline', 'highway', 'input'),
                           gt_dir=os.path.join(Path.root_dir('gt'), 'baseline', 'highway200'))
     dataloader = DataLoader(cdw_train, batch_size=3, shuffle=True)
 
@@ -83,6 +83,8 @@ if __name__ == '__main__':
             # mask_tmp = mask_tmp.astype(np.uint8)
             mask_tmp = decode_segmap(mask_tmp)
             img_tmp = np.transpose(img[j], axes=[1, 2, 0])
+            img_tmp *= (0.229, 0.224, 0.225)
+            img_tmp += (0.485, 0.456, 0.406)
             img_tmp *= 255.0
             img_tmp = img_tmp.astype(np.uint8)
             plt.figure()
