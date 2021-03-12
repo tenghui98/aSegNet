@@ -147,4 +147,3 @@ if __name__ == '__main__':
                 trainer.training(epoch)
                 if epoch % args.eval_interval == (args.eval_interval - 1):
                     trainer.validation(epoch)
-            trainer.writer.close()
