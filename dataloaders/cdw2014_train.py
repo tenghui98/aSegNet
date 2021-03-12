@@ -4,6 +4,7 @@ import glob
 import os
 from PIL import Image
 import numpy as np
+from tqdm import tqdm
 from torch.utils.data import Dataset
 from torchvision import transforms
 from dataloaders import custom_transforms as tr
@@ -14,7 +15,7 @@ class CDW_Train(Dataset):
     # VOID_LABEL = -1
     NUM_CLASSES = 2
 
-    def __init__(self, args,gt_dir, img_dir):
+    def __init__(self, args, gt_dir, img_dir):
         super().__init__()
         self._gt_dir = gt_dir
         self.args = args
@@ -37,24 +38,35 @@ class CDW_Train(Dataset):
         self.img_dir_list = sorted(img_dir_list)
         self.mask_dir_list = sorted(mask_dir_list)
 
+        self.images = []
+        self.gts = []
+        if self.args.in_memory:
+            print('Loading things into memory')
+            tbar = tqdm(range(len(self.img_dir_list)))
+            for im in tbar:
+                image,gt = self._make_img_gt_point_pair(im)
+                self.images.append(image)
+                self.gts.append(gt)
+
     def __len__(self):
         return len(self.img_dir_list)
 
     def __getitem__(self, item):
-        _img, _target= self._make_img_gt_point_pair(item)
+        if self.args.in_memory:
+            _img,_target = self.images[item],self.gts[item]
+        else:
+            _img, _target= self._make_img_gt_point_pair(item)
         sample = {'image': _img, 'label': _target}
-        return self._transform(sample)
+        tr_sample = self._transform(sample)
+        return tr_sample
 
     def _make_img_gt_point_pair(self, item):
         _img = Image.open(self.img_dir_list[item]).convert('RGB')
-        _target = Image.open(self.mask_dir_list[item])
+        _target = Image.open(self.mask_dir_list[item]).convert('L')
         return _img, _target
 
     def _transform(self, sample):
         composed_transforms = transforms.Compose([
-            # tr.RandomHorizontalFlip(),
-            # tr.RandomScaleCrop(base_size=240, crop_size=224),
-            # tr.RandomGaussianBlur(),
             tr.Normalize(self.args, mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
             tr.ToTensor()
         ])

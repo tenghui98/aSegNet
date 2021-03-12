@@ -46,7 +46,7 @@ class SegmentationLosses(object):
         s16_loss = F.binary_cross_entropy_with_logits(s16, target, reduction='mean', pos_weight=self.weight)
 
         loss = s1_loss + s4_loss+ s16_loss
-        print('s1_cos:{:.5}'.format(s1_loss) + '  s4:{:.5}'.format(s4_loss) + ' s16:{:.5}'.format(s16_loss))
+        # print('s1_cos:{:.5}'.format(s1_loss) + '  s4:{:.5}'.format(s4_loss) + ' s16:{:.5}'.format(s16_loss))
 
         if self.batch_average:
             loss /= n

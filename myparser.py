@@ -45,6 +45,8 @@ def parser():
                         help='label 170 is set to 0 or 2')
     parser.add_argument('--cbam', action='store_true', default=False,
                         help='cbam attention')
+    parser.add_argument('--in_memory', action='store_false', default=True,
+                        help='cbam attention')
     args = parser.parse_args()
     if args.epochs is None:
         args.epochs = 100
