@@ -19,6 +19,8 @@ class Trainer(object):
         self.args = args
         self.saver = Saver(args)
         self.saver.save_experiment_config()
+        self.summary = TensorboardSummary(self.saver.experiment_dir)
+        self.writer = self.summary.create_summary()
         kwargs = {}
         self.train_loader, self.val_loader, self.test_loader, self.nclass = make_data_loader(args, **kwargs)
         model = DeepLabv3_plus(nInputChannels=3, n_classes=2, os=16, pretrained=True)
@@ -26,6 +28,7 @@ class Trainer(object):
                         {'params': get_10x_lr_params(model), 'lr': args.lr * 10}]
         optimizer = torch.optim.SGD(train_params, momentum=args.momentum,
                                     weight_decay=args.weight_decay, nesterov=False)
+
         if args.use_balanced_weights:
             classes_weights_path = os.path.join(Path.root_dir('img'), args.category, args.scene,
                                                 args.scene + '_classes_weights.npy')
@@ -72,7 +75,10 @@ class Trainer(object):
             self.optimizer.step()
             train_loss += loss.item()
             tbar.set_description('Train loss: %.5f' % (train_loss / (i + 1)))
+            if i == 0:
+                self.summary.visualize_image(self.args, self.writer, image, target, pred, epoch)
 
+        self.writer.add_scalar('train/total_loss_epoch', train_loss / num_img_tr, epoch)
         print('[Epoch: %d, numImages: %5d]' % (epoch, i * self.args.batch_size + image.data.shape[0]))
         print('Loss: %.5f' % train_loss)
 
@@ -103,6 +109,11 @@ class Trainer(object):
 
         Acc = self.evaluator.Pixel_Accuracy()
         Recall, Precision, Fmeasure = self.evaluator.Stats()
+        self.writer.add_scalar('val/total_loss_epoch', val_loss / num_img_val, epoch)
+        self.writer.add_scalar('val/Acc', Acc, epoch)
+        self.writer.add_scalars('val/Stats', {'Recall': Recall,
+                                              'Precision': Precision,
+                                              'Fmearue': Fmeasure}, epoch)
         print('Validation:')
         print('[Epoch: %d, numImages: %5d]' % (epoch, i * self.args.batch_size + image.data.shape[0]))
         print('Loss: %.5f' % val_loss)
@@ -120,7 +131,7 @@ class Trainer(object):
             }, is_best, filename)
         if epoch == self.args.epochs - 1 and self.flag:
             is_best = False
-            filename = 'model_best.pth.tar'
+            filename = self.args.scene + '.pth.tar'
             self.saver.save_checkpoint({
                 'epoch': epoch + 1,
                 'state_dict': self.model.state_dict(),
@@ -147,3 +158,4 @@ if __name__ == '__main__':
                 trainer.training(epoch)
                 if epoch % args.eval_interval == (args.eval_interval - 1):
                     trainer.validation(epoch)
+            trainer.writer.close()
