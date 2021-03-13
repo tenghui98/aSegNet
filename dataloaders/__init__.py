@@ -18,6 +18,7 @@ def make_data_loader( args, **kwargs):
 
     indices = list(range(len(train_and_val)))
     np.random.shuffle(indices)
+    np.random.shuffle(indices)
     split = int(np.floor(len(train_and_val) * args.train_rate))
     train_indices = indices[:split]
     val_indices = indices[split:]

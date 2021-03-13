@@ -8,7 +8,7 @@ from mypath import  Path
 from dataloaders import make_data_loader
 from dataset_dict import dataset
 import imageio
-
+from PIL import Image
 
 model_main_dir = Path.root_dir('model')
 args = parser()
@@ -18,6 +18,12 @@ for category,scene_list in dataset.items():
         args.category = category
         args.scene = scene
         model_path = os.path.join(model_main_dir, category, scene,'model_best.pth.tar')
+
+        ROI_path = os.path.join(Path.root_dir('img'),category,scene,'ROI.bmp')
+        ROI = Image.open(ROI_path)
+        ROI = np.array(ROI).astype(np.float32)
+        idx = np.where(ROI == 0.0)
+
         result_dir = os.path.join(Path.root_dir('result'), category, scene)
         if not os.path.exists(result_dir):
             os.makedirs(result_dir)
@@ -43,6 +49,7 @@ for category,scene_list in dataset.items():
             out = out.astype(np.uint8)
 
             for jj in range(out.shape[0]):
+                out[jj][idx] = 0.0
                 img_idx += 1
                 fname = 'bin'+"%06d" % img_idx +'.png'
                 imageio.imwrite(os.path.join(result_dir,fname),out[jj])

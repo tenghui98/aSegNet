@@ -120,7 +120,7 @@ class Trainer(object):
             }, is_best, filename)
         if epoch == self.args.epochs - 1 and self.flag:
             is_best = False
-            filename = self.args.scene + '.pth.tar'
+            filename = 'model_best.pth.tar'
             self.saver.save_checkpoint({
                 'epoch': epoch + 1,
                 'state_dict': self.model.state_dict(),
