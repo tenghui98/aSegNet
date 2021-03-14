@@ -1,6 +1,6 @@
 from tqdm import tqdm
 import torch
-from model.deepfeg import DeepLabv3_plus
+from model.deepfeg2 import DeepLabv3_plus
 import os
 import numpy as np
 from myparser import parser

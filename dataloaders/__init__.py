@@ -26,7 +26,7 @@ def make_data_loader( args, **kwargs):
     val_set = Subset(train_and_val, indices=val_indices)
 
     test_set = CDW_Test(img_dir = img_dir)
-    train_loader = DataLoader(train_set, batch_size=args.batch_size, shuffle=True,num_workers=3, **kwargs)
-    val_loader = DataLoader(val_set, batch_size=args.batch_size, shuffle=False,num_workers=3, **kwargs)
+    train_loader = DataLoader(train_set, batch_size=args.batch_size, shuffle=True,num_workers = 3, **kwargs)
+    val_loader = DataLoader(val_set, batch_size=args.batch_size, shuffle=False, **kwargs)
     test_loader = DataLoader(test_set,batch_size=args.test_batch_size,shuffle=False,**kwargs)
     return train_loader,val_loader,test_loader,n_classes

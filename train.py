@@ -8,7 +8,7 @@ from utils.calculate_weights import calculate_weigths_labels
 from utils.lr_scheduler import LR_Scheduler
 from utils.loss import SegmentationLosses
 from utils.metrics import Evaluator
-from model.deepfeg import DeepLabv3_plus, get_1x_lr_params, get_10x_lr_params
+from model.deepfeg2 import DeepLabv3_plus, get_1x_lr_params, get_10x_lr_params
 from dataloaders import make_data_loader
 from mypath import Path
 from dataset_dict import dataset
