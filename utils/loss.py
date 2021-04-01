@@ -3,12 +3,13 @@ import torch.nn as nn
 from torch import Tensor
 # from .dice_loss import DiceLoss
 import torch.nn.functional as F
+import numpy as np
 
 
 class SegmentationLosses(object):
-    def __init__(self, weight=None, size_average=True, ignore_index=2, batch_average=True, cuda=True):
-        self.ignore_index = ignore_index
+    def __init__(self, weight, size_average=True, ignore_index=2, batch_average=True, cuda=True):
         self.weight = weight
+        self.ignore_index = ignore_index
         self.size_average = size_average
         self.batch_average = batch_average
         self.cuda = cuda
@@ -26,61 +27,42 @@ class SegmentationLosses(object):
 
     def L1CELoss(self, logit, target):
 
-        s16, s4, s1 = logit['s16'], logit['s4'], logit['s1']
-        n, c, h, w = s1.size()
-        pred_s1 = torch.sigmoid(s1)
-        s1 = torch.squeeze(s1, 1)
-        s4 = torch.squeeze(s4, 1)
-        s16 = torch.squeeze(s16, 1)
-        pred_s1 = torch.squeeze(pred_s1,1)
+        s1 = torch.squeeze(logit, 1)
         mask = torch.ne(target, self.ignore_index)
         target = target[mask]
         s1 = s1[mask]
-        s4 = s4[mask]
-        s16 = s16[mask]
-        pred_s1 = pred_s1[mask]
-
-        # s1_loss = F.binary_cross_entropy_with_logits(s1, target, reduction='mean', pos_weight=self.weight)
-        s1_loss = 2*(1-F.cosine_similarity(pred_s1,target,dim=0))
-        s4_loss = F.binary_cross_entropy_with_logits(s4, target, reduction='mean', pos_weight=self.weight)
-        s16_loss = F.binary_cross_entropy_with_logits(s16, target, reduction='mean', pos_weight=self.weight)
-
-        loss = s1_loss + s4_loss+ s16_loss
-        # print('s1_cos:{:.5}'.format(s1_loss) + '  s4:{:.5}'.format(s4_loss) + ' s16:{:.5}'.format(s16_loss))
-
-        if self.batch_average:
-            loss /= n
+        s1_loss = F.binary_cross_entropy_with_logits(s1, target, reduction='mean', pos_weight=self.weight)
+        loss = s1_loss
         return loss
 
-    def CrossEntropyLoss(self, logit, target):
+    # def CrossEntropyLoss(self, logit, target):
+    #
+    #     n, c, h, w = logit.size()
+    #     criterion = nn.CrossEntropyLoss(weight=self.weight, ignore_index=self.ignore_index,
+    #                                     size_average=self.size_average)
+    #     if self.cuda:
+    #         criterion = criterion.cuda()
+    #
+    #     loss = criterion(logit, target.long())
+    #
+    #     if self.batch_average:
+    #         loss /= n
+    #
+    #     return loss
 
-        n, c, h, w = logit.size()
-        criterion = nn.CrossEntropyLoss(weight=self.weight, ignore_index=self.ignore_index,
-                                        size_average=self.size_average)
-        if self.cuda:
-            criterion = criterion.cuda()
+    def FocalLoss(self, logit, target, gamma=1, alpha=0.25):
+        with torch.no_grad():
+            alphas = torch.empty_like(logit).fill_(1 - alpha)
+            alphas[target == 1] = alpha
 
-        loss = criterion(logit, target.long())
-
-        if self.batch_average:
-            loss /= n
-
-        return loss
-
-    def FocalLoss(self, logit, target, gamma=2, alpha=0.25):
-        n, c, h, w = logit.size()
-        criterion = nn.CrossEntropyLoss(weight=self.weight, ignore_index=self.ignore_index, reduction='mean')
-        if self.cuda:
-            criterion = criterion.cuda()
-
-        logpt = -criterion(logit, target.long())
+        logpt = -F.binary_cross_entropy_with_logits(logit, target, reduction='none', pos_weight=self.weight)
         pt = torch.exp(logpt)
-        if alpha is not None:
-            logpt *= alpha
-        loss = -((1 - pt) ** gamma) * logpt
+        loss = -((1 - pt) ** gamma) * alphas * logpt
 
-        if self.batch_average:
-            loss /= n
+        loss = loss.mean()
+
+        # if self.batch_average:
+        #     loss /= n
 
         return loss
 
@@ -91,18 +73,50 @@ class DiceLoss(nn.Module):
         self.ignore_index = ignore_index
 
     def forward(self, logit, target):
-        N = target.size(0)
         smooth = 1
-        logit = torch.squeeze(logit, 1)
-        mask = torch.ne(target, self.ignore_index)
-        logit_flat = logit[mask]
-        target_flat = target[mask]
+        intersection = logit * target
+        loss = 2 * (intersection.sum() + smooth) / (logit.sum() + target.sum() + smooth)
+        loss = 1 - loss
 
-        intersection = logit_flat * target_flat
+        return loss
 
-        loss = 2 * (intersection.sum() + smooth) / (logit_flat.sum() + target_flat.sum() + smooth)
-        loss = 1 - loss.sum() / N
 
+class FocalLossV1(nn.Module):
+
+    def __init__(self, alpha=0.25, gamma=2, reduction='mean', ):
+        super(FocalLossV1, self).__init__()
+        self.alpha = alpha
+        self.gamma = gamma
+        self.reduction = reduction
+        self.crit = nn.BCEWithLogitsLoss(reduction='none')
+
+    def forward(self, logits, label):
+        '''
+        logits and label have same shape, and label data type is long
+        args:
+            logits: tensor of shape (N, ...)
+            label: tensor of shape(N, ...)
+        Usage is like this:
+            >>> criteria = FocalLossV1()
+            >>> logits = torch.randn(8, 19, 384, 384)# nchw, float/half
+            >>> lbs = torch.randint(0, 19, (8, 384, 384)) # nchw, int64_t
+            >>> loss = criteria(logits, lbs)
+        '''
+
+        # compute loss
+        logits = logits.float()  # use fp32 if logits is fp16
+        with torch.no_grad():
+            alpha = torch.empty_like(logits).fill_(1 - self.alpha)
+            alpha[label == 1] = self.alpha
+
+        probs = torch.sigmoid(logits)
+        pt = torch.where(label == 1, probs, 1 - probs)
+        ce_loss = self.crit(logits, label.float())
+        loss = (alpha * torch.pow(1 - pt, self.gamma) * ce_loss)
+        if self.reduction == 'mean':
+            loss = loss.mean()
+        if self.reduction == 'sum':
+            loss = loss.sum()
         return loss
 
 

@@ -23,12 +23,10 @@ class Normalize(object):
         img -= self.mean
         img /= self.std
         # hard shadow 50 , outside region of interest(ROI) 85,
-        gt /=255.0
 
-        gt[np.where((gt < 100/255.0))] = 0
-        gt[np.where(gt >= 0.8)] = 1
-        gt[np.where((gt > 100/255.0) &(gt < 0.8))] = 2
-
+        gt[np.where(gt == 50)] = 0
+        gt[np.where((gt == 170) | (gt == 85))] = 2
+        gt[np.where(gt == 255)] = 1
 
         # val_gt = np.floor(val_gt)
         return {'image': img,
@@ -84,6 +82,7 @@ class RandomGaussianBlur(object):
         return {'image': img,
                 'label': mask}
 
+
 class RandomHorizontalFlip(object):
     def __call__(self, sample):
         img = sample['image']
@@ -93,6 +92,7 @@ class RandomHorizontalFlip(object):
             mask = mask.transpose(Image.FLIP_LEFT_RIGHT)
         return {'image': img,
                 'label': mask}
+
 
 class RandomScaleCrop(object):
     def __init__(self, base_size, crop_size, fill=0):
@@ -131,7 +131,6 @@ class RandomScaleCrop(object):
                 'label': mask}
 
 
-
 def decode_segmap(label_mask, plot=False):
     label_colours = np.asarray([[0, 0, 0], [255, 255, 255]])
     n_classes = 2
@@ -165,5 +164,3 @@ def decode_segmap_sequence(label_masks):
         masks.append(decode_segmap(label_mask))
     masks = torch.from_numpy(np.array(masks).transpose([0, 3, 1, 2]))
     return masks
-
-

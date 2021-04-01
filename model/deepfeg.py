@@ -329,7 +329,7 @@ def get_10x_lr_params(model):
 
 
 if __name__ == "__main__":
-    model = DeepLabv3_plus(nInputChannels=3, n_classes=1, os=16, pretrained=True, _print=True)
+    model = ResNet50()
     model.eval()
     image = torch.randn(10, 3, 512, 512)
     with torch.no_grad():

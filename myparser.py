@@ -11,7 +11,7 @@ def parser():
     parser.add_argument('--batch_size', type=int, default=None,
                         metavar='N', help='input batch size for \
                                 training (default: auto)')
-    parser.add_argument('--test_batch_size', type=int, default=32,
+    parser.add_argument('--test_batch_size', type=int, default=8,
                         metavar='N', help='input batch size for \
                                 testing (default: auto)')
     parser.add_argument('--use_balanced_weights', action='store_true', default=False,
