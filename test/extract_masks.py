@@ -1,6 +1,8 @@
 from tqdm import tqdm
 import torch
 from model.deepfeg1 import DeepLabv3_plus
+from model.deepfeg1 import DeepLabv3_plus
+from model.unet.unet_model import UNet
 import os
 import numpy as np
 from myparser import parser
@@ -12,7 +14,8 @@ from PIL import Image
 
 model_main_dir = Path.root_dir('model')
 args = parser()
-model = DeepLabv3_plus(nInputChannels=3, n_classes=2, os=16, pretrained=True)
+# model = DeepLabv3_plus(nInputChannels=3, n_classes=2, os=16, pretrained=True)
+model = UNet(n_channels=3, n_classes=1)
 for category,scene_list in dataset.items():
     for scene in scene_list:
         args.category = category

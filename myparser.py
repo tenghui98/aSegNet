@@ -11,7 +11,7 @@ def parser():
     parser.add_argument('--batch_size', type=int, default=None,
                         metavar='N', help='input batch size for \
                                 training (default: auto)')
-    parser.add_argument('--test_batch_size', type=int, default=8,
+    parser.add_argument('--test_batch_size', type=int, default=4,
                         metavar='N', help='input batch size for \
                                 testing (default: auto)')
     parser.add_argument('--use_balanced_weights', action='store_true', default=False,
@@ -55,7 +55,7 @@ def parser():
         args.batch_size = 1
 
     if args.lr is None:
-        args.lr = 0.001
+        args.lr = 0.007
 
     if args.checkname is None:
         # args.checkname = 'deeplab-cdw2014'
