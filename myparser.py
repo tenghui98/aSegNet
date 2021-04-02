@@ -55,7 +55,7 @@ def parser():
         args.batch_size = 1
 
     if args.lr is None:
-        args.lr = 0.007
+        args.lr = 0.0007
 
     if args.checkname is None:
         # args.checkname = 'deeplab-cdw2014'

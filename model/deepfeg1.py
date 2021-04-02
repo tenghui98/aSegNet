@@ -154,7 +154,7 @@ class ResNet(nn.Module):
 
 
 def ResNet50(nInputChannels=3, os=8, pretrained=False):
-    model = ResNet(nInputChannels, Bottleneck, [3, 4, 3, 3], os, pretrained=pretrained)
+    model = ResNet(nInputChannels, Bottleneck, [3, 4, 6, 3], os, pretrained=pretrained)
     return model
 
 
@@ -197,10 +197,10 @@ class DeepLabv3_plus(nn.Module):
         # Atrous Conv
         self.resnet_features = ResNet50(nInputChannels, os, pretrained=pretrained)
 
-        # for i, p in enumerate(self.resnet_features.parameters()):
-        #     # 102 layer3 的后三个模块参与训练
-        #     if i < 72:
-        #         p.requires_grad = False
+        for i, p in enumerate(self.resnet_features.parameters()):
+            # 102 layer3 的后三个模块参与训练
+            if i < 33:
+                p.requires_grad = False
         self.encoder = Encoder(in_ch=1024)
 
         self.conv1 = nn.Conv2d(256, 128, 1, bias=False)

@@ -36,7 +36,7 @@ class ChannelGate(nn.Module):
             Flatten(),
             nn.Linear(gate_channels, gate_channels // 2),
             nn.ReLU(),
-            nn.Linear(gate_channels // 2, gate_channels // 2)
+            nn.Linear(gate_channels // 2, gate_channels//2)
         )
         self.pool_types = pool_types
 
@@ -82,14 +82,11 @@ class SpatialGate(nn.Module):
     def __init__(self):
         super(SpatialGate, self).__init__()
         kernel_size = 7
-        self.compress1 = ChannelPool()
-        self.compress2 = ChannelPool()
-        self.spatial = BasicConv(4, 1, kernel_size, stride=1, padding=(kernel_size - 1) // 2, relu=False)
+        self.compress = ChannelPool()
+        self.spatial = BasicConv(2, 1, kernel_size, stride=1, padding=(kernel_size - 1) // 2, relu=False)
 
-    def forward(self, x1, x2):
-        x1_compress = self.compress1(x1)
-        x2_compress = self.compress2(x2)
-        x_compress = torch.cat([x1_compress, x2_compress], 1)
+    def forward(self, x):
+        x_compress = self.compress(x)
         x_out = self.spatial(x_compress)
         scale = F.sigmoid(x_out)  # broadcasting
         return scale
@@ -109,8 +106,9 @@ class CBAM(nn.Module):
         channel_scale = self.ChannelGate(x)
 
         x2 = x2 * channel_scale
+        x = torch.cat([x1, x2], 1)
         if not self.no_spatial:
-            spatital_scale = self.SpatialGate(x1,x2)
+            spatital_scale = self.SpatialGate(x)
             x2 = x2 * spatital_scale
         x_out = x1 + x2
         return x_out

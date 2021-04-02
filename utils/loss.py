@@ -27,13 +27,35 @@ class SegmentationLosses(object):
 
     def L1CELoss(self, logit, target):
 
-        s1 = torch.squeeze(logit, 1)
+        # s1 = torch.squeeze(logit, 1)
+        # mask = torch.ne(target, self.ignore_index)
+        # target = target[mask]
+        # s1 = s1[mask]
+        # s1_loss = F.binary_cross_entropy_with_logits(s1, target, reduction='mean', pos_weight=self.weight)
+        # loss = s1_loss
+
+        s16, s4, s1 = logit['s16'], logit['s4'], logit['s1']
+        n, c, h, w = s1.size()
+        pred_s1 = torch.sigmoid(s1)
+        s1 = torch.squeeze(s1, 1)
+        s4 = torch.squeeze(s4, 1)
+        s16 = torch.squeeze(s16, 1)
+        pred_s1 = torch.squeeze(pred_s1, 1)
         mask = torch.ne(target, self.ignore_index)
         target = target[mask]
         s1 = s1[mask]
-        s1_loss = F.binary_cross_entropy_with_logits(s1, target, reduction='mean', pos_weight=self.weight)
-        loss = s1_loss
-        return loss
+        s4 = s4[mask]
+        s16 = s16[mask]
+        pred_s1 = pred_s1[mask]
+
+        # s1_loss = F.binary_cross_entropy_with_logits(s1, target, reduction='mean', pos_weight=self.weight)
+        s1_loss = 2 * (1 - F.cosine_similarity(pred_s1, target, dim=0))
+        s4_loss = F.binary_cross_entropy_with_logits(s4, target, reduction='mean', pos_weight=self.weight)
+        s16_loss = F.binary_cross_entropy_with_logits(s16, target, reduction='mean', pos_weight=self.weight)
+
+        loss = s1_loss + s4_loss + s16_loss
+
+        return loss, s1_loss, s4_loss
 
     # def CrossEntropyLoss(self, logit, target):
     #

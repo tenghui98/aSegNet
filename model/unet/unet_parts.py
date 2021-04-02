@@ -3,7 +3,6 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import pydensecrf.densecrf as dcrf
 import numpy as np
 from model.cbam import CBAM
 
@@ -50,7 +49,7 @@ class Up(nn.Module):
 
         # if bilinear, use the normal convolutions to reduce the number of channels
         if bilinear:
-            self.cbam = CBAM(2*in_channels,in_channels)
+            self.cbam = CBAM(2 * in_channels, in_channels, no_spatial=True)
             self.conv = DoubleConv(in_channels, out_channels)
         else:
             self.up = nn.ConvTranspose2d(in_channels, in_channels // 2, kernel_size=2, stride=2)

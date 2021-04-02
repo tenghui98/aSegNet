@@ -8,9 +8,7 @@ from utils.calculate_weights import calculate_weigths_labels
 from utils.lr_scheduler import LR_Scheduler
 from utils.loss import SegmentationLosses
 from utils.metrics import Evaluator
-# from model.deepfeg11 import DeepLabv3_plus
-from model.unet.unet_model import UNet
-from model.unet.unet_parts import dcrf
+from model.deepfeg1 import DeepLabv3_plus
 from dataloaders import make_data_loader
 from mypath import Path
 from dataset_dict import dataset
@@ -24,12 +22,12 @@ class Trainer(object):
         self.saver.save_experiment_config()
         self.summary = TensorboardSummary(self.saver.experiment_dir)
         self.writer = self.summary.create_summary()
-        self.eraly_stopping = EarlyStopping(patience=20, verbose=True)
+        self.eraly_stopping = EarlyStopping(patience=10, verbose=True)
         kwargs = {}
         self.train_loader, self.val_loader, self.test_loader, self.nclass = make_data_loader(args, **kwargs)
-        model = UNet(n_channels=3, n_classes=1, bilinear=True)
-        # model = DeepLabv3_plus(nInputChannels=3, pretrained=True)
-        optimizer = torch.optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum,
+        # model = UNet(n_channels=3, n_classes=1, bilinear=True)
+        model = DeepLabv3_plus(nInputChannels=3, pretrained=True)
+        optimizer = torch.optim.SGD(filter(lambda p: p.requires_grad, model.parameters()), lr=args.lr, momentum=args.momentum,
                                     weight_decay=args.weight_decay, nesterov=False)
 
         if args.use_balanced_weights:
@@ -51,7 +49,7 @@ class Trainer(object):
         if args.cuda:
             self.model = self.model.cuda()
 
-        self.best_pred = 0.0
+        self.best_pred = float('inf')
         self.flag = True
         if args.ft:
             args.start_epoch = 0
@@ -97,7 +95,7 @@ class Trainer(object):
                 self.summary.visualize_image(self.args, self.writer, image, target, pred, epoch)
             pred = torch.squeeze(torch.sigmoid(pred), 1)
             pred = pred.data.cpu().numpy()
-            pred = (pred > 0.7).astype('int')
+            pred = (pred > 0.9).astype('int')
             target = target.cpu().numpy()
             # pred = pred.data.cpu().numpy()
             # target = target.cpu().numpy()
@@ -116,8 +114,8 @@ class Trainer(object):
         print('[Epoch: %d, numImages: %5d]' % (epoch, i * self.args.batch_size + image.data.shape[0]))
         print('Loss: %.5f' % val_loss)
 
-        new_pred = Fmeasure
-        if new_pred > self.best_pred:
+        new_pred = val_loss / num_img_val
+        if new_pred < self.best_pred:
             is_best = True
             self.flag = False
             filename = self.args.scene + '.pth.tar'
@@ -137,7 +135,6 @@ class Trainer(object):
                 'optimizer': self.optimizer.state_dict(),
                 'best_pred': self.best_pred,
             }, is_best, filename)
-        return val_loss / num_img_val
 
 
 if __name__ == '__main__':

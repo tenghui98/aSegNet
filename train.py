@@ -2,13 +2,15 @@ import os
 import numpy as np
 from tqdm import tqdm
 import torch
+
+from pytorchtools import EarlyStopping
 from utils.saver import Saver
 from utils.summaries import TensorboardSummary
 from utils.calculate_weights import calculate_weigths_labels
 from utils.lr_scheduler import LR_Scheduler
 from utils.loss import SegmentationLosses
 from utils.metrics import Evaluator
-from model.deepfeg1 import DeepLabv3_plus, get_1x_lr_params, get_10x_lr_params
+from model.deepfeg2 import DeepLabv3_plus, get_1x_lr_params, get_10x_lr_params
 from dataloaders import make_data_loader
 from mypath import Path
 from dataset_dict import dataset
@@ -21,9 +23,10 @@ class Trainer(object):
         self.saver.save_experiment_config()
         self.summary = TensorboardSummary(self.saver.experiment_dir)
         self.writer = self.summary.create_summary()
+        self.eraly_stopping = EarlyStopping(args, patience=10, verbose=True)
         kwargs = {}
         self.train_loader, self.val_loader, self.test_loader, self.nclass = make_data_loader(args, **kwargs)
-        model = DeepLabv3_plus(nInputChannels=3, n_classes=2, os=8, pretrained=True)
+        model = DeepLabv3_plus(nInputChannels=3, n_classes=2, os=16, pretrained=True)
         # optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), args.lr,
         #                              weight_decay=args.weight_decay)
         train_params = [{'params': filter(lambda p: p.requires_grad, get_1x_lr_params(model)), 'lr': args.lr},
@@ -55,8 +58,9 @@ class Trainer(object):
         if args.cuda:
             self.model = self.model.cuda()
 
-        self.best_pred = 0.0
+        self.best_pred = float('inf')
         self.flag = True
+        self.early = 0
         if args.ft:
             args.start_epoch = 0
 
@@ -84,8 +88,8 @@ class Trainer(object):
             tbar.set_description('Train loss: %.5f' % (train_loss / (i + 1)))
 
         self.writer.add_scalars('train', {'train_loss': train_loss / num_img_tr}, epoch)
-        self.writer.add_scalars('train/single loss', {'s1_l2_loss': s1_loss / num_img_tr,
-                                                      's4_ce_loss': s4_loss / num_img_tr}, epoch)
+        self.writer.add_scalars('train/', {'s1_l2_loss': s1_loss / num_img_tr,
+                                           's4_ce_loss': s4_loss / num_img_tr}, epoch)
         print('[Epoch: %d, numImages: %5d]' % (epoch, i * self.args.batch_size + image.data.shape[0]))
         print('Loss: %.5f' % train_loss)
 
@@ -94,8 +98,7 @@ class Trainer(object):
         self.evaluator.reset()
         tbar = tqdm(self.val_loader, desc='\r')
         val_loss = 0.0
-        s1_loss = 0.0
-        s4_loss = 0.0
+
         num_img_val = len(self.val_loader)
         for i, sample in enumerate(tbar):
             image, target = sample['image'], sample['label']
@@ -105,8 +108,6 @@ class Trainer(object):
                 preds = self.model(image)
             loss, s1_loss, s4_loss = self.criterion(preds, target)
             val_loss += loss.item()
-            s1_loss += s1_loss.item()
-            s4_loss += s4_loss.item()
             tbar.set_description('Val loss: %.5f' % (val_loss / (i + 1)))
 
             if i == 0:
@@ -125,35 +126,32 @@ class Trainer(object):
         Acc = self.evaluator.Pixel_Accuracy()
         Recall, Precision, Fmeasure = self.evaluator.Stats()
         self.writer.add_scalars('train', {'val_loss': val_loss / num_img_val}, epoch)
-        self.writer.add_scalars('val/single loss', {'s1_l2_loss': s1_loss / num_img_val,
-                                                    's4_ce_loss': s4_loss / num_img_val}, epoch)
         self.writer.add_scalars('val/Stats', {'Recall': Recall,
                                               'Precision': Precision,
                                               'Fmearue': Fmeasure}, epoch)
         print('Validation:')
         print('[Epoch: %d, numImages: %5d]' % (epoch, i * self.args.batch_size + image.data.shape[0]))
         print('Loss: %.5f' % val_loss)
-        new_pred = Fmeasure
-        if new_pred > self.best_pred:
-            is_best = True
-            self.flag = False
-            filename = self.args.scene + '.pth.tar'
-            self.best_pred = new_pred
-            self.saver.save_checkpoint({
-                'epoch': epoch + 1,
-                'state_dict': self.model.state_dict(),
-                'optimizer': self.optimizer.state_dict(),
-                'best_pred': self.best_pred,
-            }, is_best, filename)
-        if epoch == self.args.epochs - 1 and self.flag:
-            is_best = False
-            filename = self.args.scene + '.pth.tar'
-            self.saver.save_checkpoint({
-                'epoch': epoch + 1,
-                'state_dict': self.model.state_dict(),
-                'optimizer': self.optimizer.state_dict(),
-                'best_pred': self.best_pred,
-            }, is_best, filename)
+        new_pred = val_loss / num_img_val
+
+        self.eraly_stopping(self.saver, new_pred, trainer.model)
+        if self.eraly_stopping.early_stop:
+            print("Early stopping")
+            self.early = 1
+
+        # if new_pred < self.best_pred:
+        #     is_best = True
+        #     self.flag = False
+        #     filename = self.args.scene + '.pth.tar'
+        #     self.best_pred = new_pred
+        #     self.saver.save_checkpoint({
+        #         'epoch': epoch + 1,
+        #         'state_dict': self.model.state_dict(),
+        #         'optimizer': self.optimizer.state_dict(),
+        #         'best_pred': self.best_pred,
+        #     }, is_best, filename)
+
+        return self.early
 
 
 if __name__ == '__main__':
@@ -173,5 +171,7 @@ if __name__ == '__main__':
             for epoch in range(trainer.args.start_epoch, trainer.args.epochs):
                 trainer.training(epoch)
                 if epoch % args.eval_interval == (args.eval_interval - 1):
-                    trainer.validation(epoch)
+                    flag = trainer.validation(epoch)
+                    if flag == 1:
+                        break
             trainer.writer.close()
