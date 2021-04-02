@@ -22,22 +22,22 @@ class Saver(object):
         filename = os.path.join(self.experiment_dir, filename)
         torch.save(state, filename)
         if is_best:
-            best_pred = state['best_pred']
-            with open(os.path.join(self.experiment_dir, 'best_pred.txt'), 'w') as f:
-                f.write(str(best_pred))
+            best = state['min_loss']
+            with open(os.path.join(self.experiment_dir, 'min_loss.txt'), 'w') as f:
+                f.write(str(best))
             if self.runs:
-                previous_miou = [0.0]
+                previous_loss = [0.0]
                 for run in self.runs:
                     run_id = run.split('_')[-1]
-                    path = os.path.join(self.directory, 'experiment_{}'.format(str(run_id)), 'best_pred.txt')
+                    path = os.path.join(self.directory, 'experiment_{}'.format(str(run_id)), 'min_loss.txt')
                     if os.path.exists(path):
                         with open(path, 'r') as f:
-                            miou = float(f.readline())
-                            previous_miou.append(miou)
+                            loss = float(f.readline())
+                            previous_loss.append(loss)
                     else:
                         continue
-                max_miou = max(previous_miou)
-                if best_pred > max_miou:
+                min_loss = min(previous_loss)
+                if best < min_loss:
                     shutil.copyfile(filename, os.path.join(self.directory, 'model_best.pth.tar'))
             else:
                 shutil.copyfile(filename, os.path.join(self.directory, 'model_best.pth.tar'))
@@ -55,7 +55,6 @@ class Saver(object):
         p['batch_size'] =self.args.batch_size
         p['use_balance_weight'] = self.args.use_balanced_weights
         p['motion label'] = self.args.motion
-        p['cbam'] = self.args.cbam
 
         for key, val in p.items():
             log_file.write(key + ':' + str(val) + '\n')

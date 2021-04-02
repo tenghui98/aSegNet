@@ -32,7 +32,7 @@ class SegmentationLosses(object):
         s1 = torch.squeeze(s1, 1)
         s4 = torch.squeeze(s4, 1)
         s16 = torch.squeeze(s16, 1)
-        pred_s1 = torch.squeeze(pred_s1,1)
+        pred_s1 = torch.squeeze(pred_s1, 1)
         mask = torch.ne(target, self.ignore_index)
         target = target[mask]
         s1 = s1[mask]
@@ -41,11 +41,11 @@ class SegmentationLosses(object):
         pred_s1 = pred_s1[mask]
 
         # s1_loss = F.binary_cross_entropy_with_logits(s1, target, reduction='mean', pos_weight=self.weight)
-        s1_loss = 2*(1-F.cosine_similarity(pred_s1,target,dim=0))
+        s1_loss = 2 * (1 - F.cosine_similarity(pred_s1, target, dim=0))
         s4_loss = F.binary_cross_entropy_with_logits(s4, target, reduction='mean', pos_weight=self.weight)
         s16_loss = F.binary_cross_entropy_with_logits(s16, target, reduction='mean', pos_weight=self.weight)
 
-        loss = s1_loss + s4_loss+ s16_loss
+        loss = s1_loss + s4_loss + s16_loss
         # print('s1_cos:{:.5}'.format(s1_loss) + '  s4:{:.5}'.format(s4_loss) + ' s16:{:.5}'.format(s16_loss))
 
         if self.batch_average:

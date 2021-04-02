@@ -1,8 +1,10 @@
 import argparse
+
+
 def parser():
     parser = argparse.ArgumentParser(description='Deeplab training')
     parser.add_argument('--loss-type', type=str, default='l1ce',
-                        choices=['ce', 'focal','dice'],
+                        choices=['ce', 'focal', 'dice'],
                         help='loss func type (default: ce)')
     parser.add_argument('--epochs', type=int, default=None, metavar='N',
                         help='number of epochs to train (default: auto)')
@@ -11,7 +13,7 @@ def parser():
     parser.add_argument('--batch_size', type=int, default=None,
                         metavar='N', help='input batch size for \
                                 training (default: auto)')
-    parser.add_argument('--test_batch_size', type=int, default=32,
+    parser.add_argument('--test_batch_size', type=int, default=16,
                         metavar='N', help='input batch size for \
                                 testing (default: auto)')
     parser.add_argument('--use_balanced_weights', action='store_true', default=False,
@@ -26,13 +28,11 @@ def parser():
     parser.add_argument('--weight-decay', type=float, default=5e-4,
                         metavar='M', help='w-decay (default: 5e-4)')
     parser.add_argument('--cuda', action='store_false', default=
-                        True, help='enables CUDA training')
+    True, help='enables CUDA training')
     parser.add_argument('--ft', action='store_true', default=False,
                         help='finetuning on a different dataset')
     parser.add_argument('--eval-interval', type=int, default=1,
                         help='evaluation interval (default: 1)')
-    parser.add_argument('--seed', type=int, default=1, metavar='S',
-                        help='random seed (default: 1)')
     parser.add_argument('--checkname', type=str, default=None,
                         help='set the checkpoint name')
     parser.add_argument('--category', type=str, default='baseline',
@@ -43,8 +43,8 @@ def parser():
                         help='splitting rate')
     parser.add_argument('--motion', action='store_false', default=True,
                         help='label 170 is set to 0 or 2')
-    parser.add_argument('--cbam', action='store_true', default=False,
-                        help='cbam attention')
+    parser.add_argument('--seed', type=int, default=1,
+                        help='seed')
     parser.add_argument('--in_memory', action='store_false', default=True,
                         help='cbam attention')
     args = parser.parse_args()
@@ -58,6 +58,5 @@ def parser():
         args.lr = 0.001
 
     if args.checkname is None:
-        # args.checkname = 'deeplab-cdw2014'
         args.checkname = 'deepfeg-cdw2014'
     return args

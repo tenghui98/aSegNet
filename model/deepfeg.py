@@ -44,6 +44,7 @@ class Bottleneck(nn.Module):
 
         return out
 
+
 class ResNet(nn.Module):
 
     def __init__(self, nInputChannels, block, layers, os=16, pretrained=False):
@@ -62,7 +63,7 @@ class ResNet(nn.Module):
 
         # Modules
         self.conv1 = nn.Conv2d(nInputChannels, 64, kernel_size=7, stride=2, padding=3,
-                                bias=False)
+                               bias=False)
         self.bn1 = nn.BatchNorm2d(64)
         self.relu = nn.ReLU(inplace=True)
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
@@ -104,10 +105,10 @@ class ResNet(nn.Module):
             )
 
         layers = []
-        layers.append(block(self.inplanes, planes, stride, dilation=blocks[0]*dilation, downsample=downsample))
+        layers.append(block(self.inplanes, planes, stride, dilation=blocks[0] * dilation, downsample=downsample))
         self.inplanes = planes * block.expansion
         for i in range(1, len(blocks)):
-            layers.append(block(self.inplanes, planes, stride=1, dilation=blocks[i]*dilation))
+            layers.append(block(self.inplanes, planes, stride=1, dilation=blocks[i] * dilation))
 
         return nn.Sequential(*layers)
 
@@ -142,6 +143,7 @@ class ResNet(nn.Module):
                 model_dict[k] = v
         state_dict.update(model_dict)
         self.load_state_dict(state_dict)
+
 
 def ResNet50(nInputChannels=3, os=16, pretrained=False):
     model = ResNet(nInputChannels, Bottleneck, [3, 4, 6, 3], os, pretrained=pretrained)
@@ -195,7 +197,7 @@ class DeepLabv3_plus(nn.Module):
 
         # ASPP
         if os == 16:
-            dilations = [1, 4, 8, 12]
+            dilations = [1, 4, 8, 16]
         elif os == 8:
             dilations = [1, 12, 24, 36]
         else:
@@ -223,29 +225,31 @@ class DeepLabv3_plus(nn.Module):
         self.conv3 = nn.Conv2d(2048, 256, 1, bias=False)
         self.bn3 = nn.BatchNorm2d(256)
 
-        self.last_conv = nn.Sequential(nn.Conv2d(304+1, 256, kernel_size=3, stride=1, padding=1, bias=False),
+        self.last_conv = nn.Sequential(nn.Conv2d(304 + 1, 256, kernel_size=3, stride=1, padding=1, bias=False),
                                        nn.BatchNorm2d(256),
                                        nn.ReLU(),
+                                       nn.Dropout(0.5),
                                        nn.Conv2d(256, 256, kernel_size=3, stride=1, padding=1, bias=False),
                                        nn.BatchNorm2d(256),
                                        nn.ReLU(),
+                                       nn.Dropout(0.1),
                                        nn.Conv2d(256, 1, kernel_size=1, stride=1))
         self.last2_conv = nn.Sequential(nn.Conv2d(513, 256, kernel_size=3, stride=1, padding=1, bias=False),
-                                       nn.BatchNorm2d(256),
-                                       nn.ReLU())
-        self.res_dropout = nn.Dropout2d(0.5)
-        self.aspp_dropout = nn.Dropout2d(0.5)
+                                        nn.BatchNorm2d(256),
+                                        nn.ReLU(),
+                                        nn.Dropout(0.5))
+        self.res_dropout = nn.Dropout2d(0.25)
+        self.aspp_dropout = nn.Dropout(0.5)
 
-        self.conv_s4 = nn.Conv2d(256+48,1,kernel_size=1,stride=1)
-        self.conv_s16 = nn.Conv2d(512,1,kernel_size=1,stride=1)
+        self.conv_s4 = nn.Conv2d(256 + 48, 1, kernel_size=1, stride=1)
+        self.conv_s16 = nn.Conv2d(512, 1, kernel_size=1, stride=1)
         if freeze_bn:
             self._freeze_bn()
 
-
     def forward(self, input):
         res_feat_16, low_level_features = self.resnet_features(input)
-        x = self.res_dropout(res_feat_16)
-
+        # x = self.res_dropout(res_feat_16)
+        x = res_feat_16
         x1 = self.aspp1(x)
         x2 = self.aspp2(x)
         x3 = self.aspp3(x)
@@ -254,6 +258,7 @@ class DeepLabv3_plus(nn.Module):
         x5 = F.upsample(x5, size=x4.size()[2:], mode='bilinear', align_corners=True)
 
         x = torch.cat((x1, x2, x3, x4, x5), dim=1)
+        x = self.aspp_dropout(x)
         x = self.conv1(x)
         x = self.bn1(x)
         x = self.relu(x)
@@ -262,27 +267,27 @@ class DeepLabv3_plus(nn.Module):
         res_feat_16 = self.bn3(res_feat_16)
         res_feat_16 = self.relu(res_feat_16)
 
-        s16 = self.conv_s16(torch.cat([x,res_feat_16],1))
+        s16 = self.conv_s16(torch.cat([x, res_feat_16], 1))
         out_s16 = F.upsample(s16, size=input.size()[2:], mode='bilinear', align_corners=True)
         pred_s16 = torch.sigmoid(s16)
 
-        x = self.last2_conv(torch.cat([x,res_feat_16,pred_s16],1))
-        x = F.upsample(x, size=(int(math.ceil(input.size()[-2]/4)),
-                                int(math.ceil(input.size()[-1]/4))), mode='bilinear', align_corners=True)
+        x = self.last2_conv(torch.cat([x, res_feat_16, pred_s16], 1))
+        x = F.upsample(x, size=(int(math.ceil(input.size()[-2] / 4)),
+                                int(math.ceil(input.size()[-1] / 4))), mode='bilinear', align_corners=True)
 
         low_level_features = self.conv2(low_level_features)
         low_level_features = self.bn2(low_level_features)
         low_level_features = self.relu(low_level_features)
 
-        s4 = self.conv_s4(torch.cat([x,low_level_features],1))
+        s4 = self.conv_s4(torch.cat([x, low_level_features], 1))
         out_s4 = F.upsample(s4, size=input.size()[2:], mode='bilinear', align_corners=True)
         pred_s4 = torch.sigmoid(s4)
 
-        x = torch.cat((x, low_level_features,pred_s4), dim=1)
+        x = torch.cat((x, low_level_features, pred_s4), dim=1)
         x = self.last_conv(x)
         s1 = F.interpolate(x, size=input.size()[2:], mode='bilinear', align_corners=True)
 
-        return {'s16':out_s16,
+        return {'s16': out_s16,
                 's4': out_s4,
                 's1': s1}
 
@@ -335,9 +340,3 @@ if __name__ == "__main__":
     with torch.no_grad():
         output = model.forward(image)
     print(output.size())
-
-
-
-
-
-
