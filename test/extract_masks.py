@@ -1,8 +1,7 @@
 from tqdm import tqdm
 import torch
 from model.deepfeg1 import DeepLabv3_plus
-from model.deepfeg1 import DeepLabv3_plus
-from model.unet.unet_model import UNet
+# from model.unet.unet_model import UNet
 import os
 import numpy as np
 from myparser import parser
@@ -14,8 +13,8 @@ from PIL import Image
 
 model_main_dir = Path.root_dir('model')
 args = parser()
-# model = DeepLabv3_plus(nInputChannels=3, n_classes=2, os=16, pretrained=True)
-model = UNet(n_channels=3, n_classes=1)
+model = DeepLabv3_plus(nInputChannels=3, n_classes=2, os=16, pretrained=True)
+# model = UNet(n_channels=3, n_classes=1)
 for category,scene_list in dataset.items():
     for scene in scene_list:
         args.category = category
@@ -23,7 +22,7 @@ for category,scene_list in dataset.items():
         model_path = os.path.join(model_main_dir, category, scene,'model_best.pth.tar')
 
         ROI_path = os.path.join(Path.root_dir('img'),category,scene,'ROI.bmp')
-        ROI = Image.open(ROI_path)
+        ROI = Image.open(ROI_path).convert('L')
         ROI = np.array(ROI).astype(np.float32)
         idx = np.where(ROI == 0.0)
 
@@ -46,14 +45,19 @@ for category,scene_list in dataset.items():
                 # outputs = model(img)
 
             # pred = outputs['s1']
-            pred = torch.squeeze(torch.sigmoid(pred),1)
+            # pred = torch.squeeze(torch.sigmoid(pred),1)
+            #
+            # out = (pred > args.th).cpu().numpy().astype('int')
+            # out *= 255
+            # out = out.astype(np.uint8)
 
-            out = (pred > 0.7).cpu().numpy().astype('int')
-            out *= 255
-            out = out.astype(np.uint8)
+            pred = pred.data.cpu().numpy()
+            pred = np.argmax(pred, axis=1)
+            pred *= 255
+            out = pred.astype(np.uint8)
 
             for jj in range(out.shape[0]):
-                out[jj][idx] = 0.0
+                out[jj][idx] = 0.
                 img_idx += 1
                 fname = 'bin'+"%06d" % img_idx +'.png'
                 imageio.imwrite(os.path.join(result_dir,fname),out[jj])

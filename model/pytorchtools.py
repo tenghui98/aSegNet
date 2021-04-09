@@ -34,7 +34,7 @@ class EarlyStopping:
 
     def __call__(self, saver, val_loss, model):
 
-        score = -val_loss
+        score = val_loss
 
         if self.best_score is None:
             self.best_score = score
@@ -54,6 +54,7 @@ class EarlyStopping:
         if self.verbose:
             self.trace_func(
                 f'Validation loss decreased ({self.val_loss_min:.6f} --> {val_loss:.6f}).  Saving model ...')
+
         filename = self.args.scene + '.pth.tar'
         saver.save_checkpoint({
             'state_dict': model.state_dict(),

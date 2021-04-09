@@ -17,7 +17,7 @@ def make_data_loader( args, **kwargs):
     n_classes = train_and_val.NUM_CLASSES
 
     indices = list(range(len(train_and_val)))
-    np.random.seed(42)
+    np.random.seed(args.seed)
     np.random.shuffle(indices)
     split = int(np.floor(len(train_and_val) * args.train_rate))
     train_indices = indices[:split]

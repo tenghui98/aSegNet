@@ -22,7 +22,7 @@ class Trainer(object):
         self.saver.save_experiment_config()
         self.summary = TensorboardSummary(self.saver.experiment_dir)
         self.writer = self.summary.create_summary()
-        self.eraly_stopping = EarlyStopping(patience=10, verbose=True)
+        self.eraly_stopping = EarlyStopping(args,patience=15, verbose=True)
         kwargs = {}
         self.train_loader, self.val_loader, self.test_loader, self.nclass = make_data_loader(args, **kwargs)
         # model = UNet(n_channels=3, n_classes=1, bilinear=True)
@@ -49,8 +49,8 @@ class Trainer(object):
         if args.cuda:
             self.model = self.model.cuda()
 
-        self.best_pred = float('inf')
-        self.flag = True
+        self.early = False
+        self.best_pred = 0.0
         if args.ft:
             args.start_epoch = 0
 
@@ -91,16 +91,17 @@ class Trainer(object):
             loss = self.criterion(pred, target)
             val_loss += loss.item()
             tbar.set_description('Val loss: %.5f' % (val_loss / (i + 1)))
+
+            # pred = torch.squeeze(torch.sigmoid(pred), 1)
+            # pred = pred.data.cpu().numpy()
+            # pred = (pred > args.th).astype('int')
+            # target = target.cpu().numpy()
+            pred = pred.data.cpu().numpy()
+            pred = np.argmax(pred, axis=1)
             if i == 0:
                 self.summary.visualize_image(self.args, self.writer, image, target, pred, epoch)
-            pred = torch.squeeze(torch.sigmoid(pred), 1)
-            pred = pred.data.cpu().numpy()
-            pred = (pred > 0.9).astype('int')
-            target = target.cpu().numpy()
-            # pred = pred.data.cpu().numpy()
-            # target = target.cpu().numpy()
-            # pred = np.argmax(pred, axis=1)
 
+            target = target.cpu().numpy()
             self.evaluator.add_batch(target, pred)
 
         Acc = self.evaluator.Pixel_Accuracy()
@@ -114,27 +115,12 @@ class Trainer(object):
         print('[Epoch: %d, numImages: %5d]' % (epoch, i * self.args.batch_size + image.data.shape[0]))
         print('Loss: %.5f' % val_loss)
 
-        new_pred = val_loss / num_img_val
-        if new_pred < self.best_pred:
-            is_best = True
-            self.flag = False
-            filename = self.args.scene + '.pth.tar'
-            self.best_pred = new_pred
-            self.saver.save_checkpoint({
-                'epoch': epoch + 1,
-                'state_dict': self.model.state_dict(),
-                'optimizer': self.optimizer.state_dict(),
-                'best_pred': self.best_pred,
-            }, is_best, filename)
-        if epoch == self.args.epochs - 1 and self.flag:
-            is_best = False
-            filename = self.args.scene + '.pth.tar'
-            self.saver.save_checkpoint({
-                'epoch': epoch + 1,
-                'state_dict': self.model.state_dict(),
-                'optimizer': self.optimizer.state_dict(),
-                'best_pred': self.best_pred,
-            }, is_best, filename)
+        val_loss = Fmeasure
+        self.eraly_stopping(self.saver, val_loss, trainer.model)
+        if self.eraly_stopping.early_stop:
+            print("Early stopping")
+            self.early = True
+        return self.early
 
 
 if __name__ == '__main__':
@@ -154,9 +140,8 @@ if __name__ == '__main__':
             for epoch in range(trainer.args.start_epoch, trainer.args.epochs):
                 trainer.training(epoch)
                 if epoch % args.eval_interval == (args.eval_interval - 1):
-                    val_loss = trainer.validation(epoch)
-                    trainer.eraly_stopping(val_loss, trainer.model)
-                    if trainer.eraly_stopping.early_stop:
+                    early = trainer.validation(epoch)
+                    if early:
                         print("Early stopping")
                         break
             trainer.writer.close()

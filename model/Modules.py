@@ -9,14 +9,14 @@ class Bottleneck(nn.Module):
         super().__init__()
 
         self.conv1 = nn.Sequential(nn.Conv2d(in_ch, in_ch // 2, kernel_size=1),
-                                   nn.GroupNorm(4, in_ch // 2),
+                                   nn.GroupNorm(in_ch // 32, in_ch // 2),
                                    nn.ReLU())
         self.conv2 = nn.Sequential(
             nn.Conv2d(in_ch // 2, in_ch // 2, kernel_size=3, padding=dilation, dilation=dilation),
             nn.GroupNorm(4, in_ch // 2),
             nn.ReLU())
         self.conv3 = nn.Sequential(nn.Conv2d(in_ch // 2, in_ch, kernel_size=1),
-                                   nn.GroupNorm(8, in_ch),
+                                   nn.GroupNorm(in_ch // 16, in_ch),
                                    nn.ReLU())
         self.relu = nn.ReLU()
 
@@ -33,32 +33,45 @@ class Encoder(nn.Module):
     def __init__(self, in_ch=1024, encoder_ch=128, dilations=None):
         super(Encoder, self).__init__()
         if dilations is None:
-            dilations = [1, 2, 3, 4]
-        self.conv1 = nn.Conv2d(in_ch, encoder_ch, kernel_size=1)
-        self.gn1 = nn.GroupNorm(encoder_ch//16, encoder_ch)
-        self.gap = nn.Sequential(nn.AdaptiveAvgPool2d((1, 1)),
-                                 nn.Conv2d(in_ch, encoder_ch, 1, stride=1, bias=False),
-                                 nn.GroupNorm(encoder_ch//16, encoder_ch),
-                                 nn.ReLU())
-        self.last_conv = nn.Sequential(nn.Conv2d(encoder_ch * 5, encoder_ch, kernel_size=1,bias = False),
-                                       nn.GroupNorm(encoder_ch//16, encoder_ch),
+            dilations = [1, 2, 4, 8]
+        self.conv0 = nn.Conv2d(in_ch, encoder_ch, kernel_size=1)
+        self.gn0 = nn.GroupNorm(encoder_ch // 16, encoder_ch)
+        # self.gap = nn.Sequential(nn.AdaptiveAvgPool2d((1, 1)),
+        #                          nn.Conv2d(in_ch, encoder_ch, 1, stride=1, bias=False),
+        #                          nn.GroupNorm(encoder_ch//16, encoder_ch),
+        #                          nn.ReLU())
+        self.gap = nn.AdaptiveAvgPool2d((1, 1))
+        self.conv1 = nn.Sequential(
+            nn.Conv2d(encoder_ch, encoder_ch, kernel_size=3, padding=dilations[0], dilation=dilations[0]),
+            nn.GroupNorm(encoder_ch // 16, encoder_ch),
+            nn.ReLU())
+        self.conv2 = nn.Sequential(
+            nn.Conv2d(encoder_ch, encoder_ch, kernel_size=3, padding=dilations[1], dilation=dilations[1]),
+            nn.GroupNorm(encoder_ch // 16, encoder_ch),
+            nn.ReLU())
+        self.conv3 = nn.Sequential(
+            nn.Conv2d(encoder_ch, encoder_ch, kernel_size=3, padding=dilations[2], dilation=dilations[2]),
+            nn.GroupNorm(encoder_ch // 16, encoder_ch),
+            nn.ReLU())
+        self.conv4 = nn.Sequential(
+            nn.Conv2d(encoder_ch, encoder_ch, kernel_size=3, padding=dilations[3], dilation=dilations[3]),
+            nn.GroupNorm(encoder_ch // 16, encoder_ch),
+            nn.ReLU())
+
+        self.last_conv = nn.Sequential(nn.Conv2d(encoder_ch * 5, encoder_ch, kernel_size=1, bias=False),
+                                       nn.GroupNorm(encoder_ch // 16, encoder_ch),
                                        nn.ReLU())
         self.dropout = nn.Dropout(0.5)
-        blocks = []
-        for i in range(4):
-            blocks.append(Bottleneck(encoder_ch, dilation=dilations[i]))
-
-        self.dilated_encoder = nn.ModuleList(blocks)
 
 
     def forward(self, features):
-        out = self.gn1(self.conv1(features))
-        d1 = self.dilated_encoder[0](out)
-        d2 = self.dilated_encoder[1](d1)
-        d3 = self.dilated_encoder[2](d2)
-        d4 = self.dilated_encoder[3](d3)
+        out = self.gn0(self.conv0(features))
+        d1 = self.conv1(out)
+        d2 = self.conv2(d1)
+        d3 = self.conv3(d2)
+        d4 = self.conv4(d3)
 
-        gap = self.gap(features)
+        gap = self.gap(out)
         gap = F.upsample(gap, size=out.size()[2:], mode='bilinear', align_corners=True)
 
         out = self.last_conv(torch.cat([d1, d2, d3, d4, gap], 1))

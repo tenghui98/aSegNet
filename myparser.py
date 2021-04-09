@@ -1,8 +1,10 @@
 import argparse
+
+
 def parser():
     parser = argparse.ArgumentParser(description='Deeplab training')
-    parser.add_argument('--loss-type', type=str, default='l1ce',
-                        choices=['ce', 'focal','dice'],
+    parser.add_argument('--loss-type', type=str, default='ce',
+                        choices=['ce', 'focal', 'dice'],
                         help='loss func type (default: ce)')
     parser.add_argument('--epochs', type=int, default=None, metavar='N',
                         help='number of epochs to train (default: auto)')
@@ -26,7 +28,7 @@ def parser():
     parser.add_argument('--weight-decay', type=float, default=5e-4,
                         metavar='M', help='w-decay (default: 5e-4)')
     parser.add_argument('--cuda', action='store_false', default=
-                        True, help='enables CUDA training')
+    True, help='enables CUDA training')
     parser.add_argument('--ft', action='store_true', default=False,
                         help='finetuning on a different dataset')
     parser.add_argument('--eval-interval', type=int, default=1,
@@ -41,6 +43,8 @@ def parser():
                         help='scene in category')
     parser.add_argument('--train_rate', type=int, default=0.8,
                         help='splitting rate')
+    parser.add_argument('--th', type=int, default=None,
+                        help='thershold')
     parser.add_argument('--motion', action='store_false', default=True,
                         help='label 170 is set to 0 or 2')
     parser.add_argument('--cbam', action='store_true', default=False,
@@ -55,7 +59,10 @@ def parser():
         args.batch_size = 1
 
     if args.lr is None:
-        args.lr = 0.0007
+        args.lr = 0.05
+
+    if args.th is None:
+        args.th = 0.5
 
     if args.checkname is None:
         # args.checkname = 'deeplab-cdw2014'

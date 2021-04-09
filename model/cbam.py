@@ -34,9 +34,9 @@ class ChannelGate(nn.Module):
         self.gate_channels = gate_channels
         self.mlp = nn.Sequential(
             Flatten(),
-            nn.Linear(gate_channels, gate_channels // 2),
+            nn.Linear(gate_channels, gate_channels // reduction_ratio),
             nn.ReLU(),
-            nn.Linear(gate_channels // 2, gate_channels//2)
+            nn.Linear(gate_channels // reduction_ratio, gate_channels//2)
         )
         self.pool_types = pool_types
 
@@ -95,6 +95,7 @@ class SpatialGate(nn.Module):
 class CBAM(nn.Module):
     def __init__(self, gate_channels, reduction_ratio=16, pool_types=['avg', 'max'], no_spatial=False):
         super(CBAM, self).__init__()
+
         self.ChannelGate = ChannelGate(gate_channels, reduction_ratio, pool_types)
         self.no_spatial = no_spatial
         if not no_spatial:
@@ -106,7 +107,7 @@ class CBAM(nn.Module):
         channel_scale = self.ChannelGate(x)
 
         x2 = x2 * channel_scale
-        x = torch.cat([x1, x2], 1)
+        x = torch.cat([x1, x2], dim=1)
         if not self.no_spatial:
             spatital_scale = self.SpatialGate(x)
             x2 = x2 * spatital_scale

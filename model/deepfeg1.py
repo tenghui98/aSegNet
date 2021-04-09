@@ -19,12 +19,12 @@ class Bottleneck(nn.Module):
     def __init__(self, inplanes, planes, stride=1, dilation=1, downsample=None):
         super(Bottleneck, self).__init__()
         self.conv1 = nn.Conv2d(inplanes, planes, kernel_size=1, bias=False)
-        self.bn1 = nn.GroupNorm(32, planes)
+        self.bn1 = nn.GroupNorm(planes//16, planes)
         self.conv2 = nn.Conv2d(planes, planes, kernel_size=3, stride=stride,
                                dilation=dilation, padding=dilation, bias=False)
-        self.bn2 = nn.GroupNorm(32, planes)
+        self.bn2 = nn.GroupNorm(planes//16, planes)
         self.conv3 = nn.Conv2d(planes, planes * 4, kernel_size=1, bias=False)
-        self.bn3 = nn.GroupNorm(32, 4 * planes)
+        self.bn3 = nn.GroupNorm(planes//4, 4 * planes)
         self.relu = nn.ReLU(inplace=True)
         self.downsample = downsample
         self.stride = stride
@@ -154,7 +154,7 @@ class ResNet(nn.Module):
 
 
 def ResNet50(nInputChannels=3, os=8, pretrained=False):
-    model = ResNet(nInputChannels, Bottleneck, [3, 4, 6, 3], os, pretrained=pretrained)
+    model = ResNet(nInputChannels, Bottleneck, [3, 4, 3, 3], os, pretrained=pretrained)
     return model
 
 
@@ -197,10 +197,10 @@ class DeepLabv3_plus(nn.Module):
         # Atrous Conv
         self.resnet_features = ResNet50(nInputChannels, os, pretrained=pretrained)
 
-        for i, p in enumerate(self.resnet_features.parameters()):
-            # 102 layer3 的后三个模块参与训练
-            if i < 33:
-                p.requires_grad = False
+        # for i, p in enumerate(self.resnet_features.parameters()):
+        #     # 102 layer3 的后三个模块参与训练
+        #     if i < 33:
+        #         p.requires_grad = False
         self.encoder = Encoder(in_ch=1024)
 
         self.conv1 = nn.Conv2d(256, 128, 1, bias=False)
@@ -212,23 +212,26 @@ class DeepLabv3_plus(nn.Module):
         self.dropout = nn.Dropout2d(p=0.25)
         self.conv_s4 = nn.Sequential(nn.Conv2d(128, 128, kernel_size=3, stride=1, padding=1, bias=False),
                                      nn.GroupNorm(8, 128),
-                                     nn.ReLU(),
-                                     nn.Dropout(0.5),
+                                     nn.Dropout(0.25),
                                      nn.Conv2d(128, 64, kernel_size=3, stride=1, padding=1, bias=False),
                                      nn.GroupNorm(4, 64),
                                      nn.ReLU(),
-                                     nn.Dropout(0.2))
+                                     nn.Dropout(0.25),)
         self.conv_s2 = nn.Sequential(nn.Conv2d(64, 64, kernel_size=3, padding=1, bias=False),
                                      nn.GroupNorm(4, 64),
                                      nn.ReLU(),
+                                     nn.Dropout(0.25),
+                                     nn.Conv2d(64, 64, kernel_size=3, padding=1, bias=False),
+                                     nn.GroupNorm(4, 64),
+                                     nn.ReLU(),
                                      nn.Dropout(0.1),
-                                     nn.Conv2d(64, 1, kernel_size=1))
+                                     nn.Conv2d(64, 2, kernel_size=1))
 
     def forward(self, input):
 
         x, os4, os2 = self.resnet_features(input)
 
-        x = self.dropout(x)
+        # x = self.dropout(x)
         x = self.encoder(x)
         x = F.upsample(x, size=(int(math.ceil(input.size()[-2] / 4)),
                                 int(math.ceil(input.size()[-1] / 4))), mode='bilinear', align_corners=True)
