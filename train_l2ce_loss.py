@@ -22,7 +22,7 @@ class Trainer(object):
         self.saver.save_experiment_config()
         self.summary = TensorboardSummary(self.saver.experiment_dir)
         self.writer = self.summary.create_summary()
-        self.eraly_stopping = EarlyStopping(args,patience=15, verbose=True)
+        self.eraly_stopping = EarlyStopping(args,patience=30, verbose=True)
         kwargs = {}
         self.train_loader, self.val_loader, self.test_loader, self.nclass = make_data_loader(args, **kwargs)
         # model = UNet(n_channels=3, n_classes=1, bilinear=True)
