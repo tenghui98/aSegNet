@@ -8,4 +8,4 @@ spatialdropout 0.5
 no use balanced weights
 label 170 set to 2
 
-https://kcssr.best/link/hnrHvpxr4D1XY6oD?mu=clash
+
